@@ -1,90 +1,87 @@
-name: Modern Ecommerce CI/CD
+name: Build and Push Images
 
 on:
   push:
     branches:
-      - develop
       - main
+      - staging
+  workflow_dispatch:
 
 env:
-  REGISTRY: ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}
+  REGISTRY: ${{ secrets.ACR_LOGIN_SERVER }}
+  WEB_IMAGE: elecshop-web
+  SERVER_IMAGE: elecshop-server
 
 jobs:
-
-  build-and-push-staging:
-    name: Build & Push Staging Images
-    if: github.ref == 'refs/heads/develop'
+  build-and-push:
     runs-on: ubuntu-latest
-    environment: staging
+
+    permissions:
+      contents: read
 
     steps:
-      - name: Checkout Source Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js Environment
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install Project Dependencies
-        run: npm install
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.4
 
-      - name: Run Application Build
-        run: npm run build
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Lint
+        run: pnpm turbo run lint
+
+      - name: Run Tests
+        run: pnpm turbo run test
+        continue-on-error: true
+
+      - name: Build Workspace
+        run: pnpm turbo run build
 
       - name: Login to Azure Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}
-          username: ${{ secrets.AZURE_REGISTRY_USERNAME }}
-          password: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+        run: |
+          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }} \
+          --username "${{ secrets.AZURE_REGISTRY_USERNAME }}" \
+          --password-stdin
 
-      - name: Build Staging Docker Image
+      - name: Build Web Docker Image
         run: |
           docker build \
-            -t $REGISTRY/web:staging-${{ github.sha }} \
-            -t $REGISTRY/web:staging-latest .
+          -f web/Dockerfile \
+          -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
+          -t $REGISTRY/$WEB_IMAGE:latest \
+          .
 
-      - name: Push Staging Docker Image
+      - name: Push Web Docker Image
         run: |
-          docker push $REGISTRY/web:staging-${{ github.sha }}
-          docker push $REGISTRY/web:staging-latest
+          docker push $REGISTRY/$WEB_IMAGE:${{ github.sha }}
+          docker push $REGISTRY/$WEB_IMAGE:latest
 
-  build-and-push-production:
-    name: Build & Push Production Images
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment: production
-
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js Environment
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Project Dependencies
-        run: npm install
-
-      - name: Run Application Build
-        run: npm run build
-
-      - name: Login to Azure Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}
-          username: ${{ secrets.AZURE_REGISTRY_USERNAME }}
-          password: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
-
-      - name: Build Production Docker Image
+      - name: Build Server Docker Image
         run: |
           docker build \
-            -t $REGISTRY/web:prod-${{ github.sha }} \
-            -t $REGISTRY/web:latest .
+          -f server/Dockerfile \
+          -t $REGISTRY/$SERVER_IMAGE:${{ github.sha }} \
+          -t $REGISTRY/$SERVER_IMAGE:latest \
+          .
 
-      - name: Push Production Docker Image
+      - name: Push Server Docker Image
         run: |
-          docker push $REGISTRY/web:prod-${{ github.sha }}
-          docker push $REGISTRY/web:latest
+          docker push $REGISTRY/$SERVER_IMAGE:${{ github.sha }}
+          docker push $REGISTRY/$SERVER_IMAGE:latest
+
+      - name: Display Published Images
+        run: |
+          echo "Published:"
+          echo "$REGISTRY/$WEB_IMAGE:${{ github.sha }}"
+          echo "$REGISTRY/$WEB_IMAGE:latest"
+          echo "$REGISTRY/$SERVER_IMAGE:${{ github.sha }}"
+          echo "$REGISTRY/$SERVER_IMAGE:latest"

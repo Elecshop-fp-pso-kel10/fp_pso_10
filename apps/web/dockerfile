@@ -1,0 +1,25 @@
+FROM node:20-alpine AS base
+
+RUN corepack enable
+
+WORKDIR /app
+
+COPY . .
+
+RUN pnpm install --frozen-lockfile
+
+RUN pnpm turbo run build --filter=@elecshop/web
+
+FROM node:20-alpine AS runner
+
+RUN corepack enable
+
+WORKDIR /app
+
+COPY . .
+
+RUN pnpm install --prod --frozen-lockfile
+
+EXPOSE 3000
+
+CMD ["pnpm", "--filter=@elecshop/web", "start"]
