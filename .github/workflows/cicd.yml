@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: ${{ secrets.ACR_LOGIN_SERVER }}
+  REGISTRY: ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}
   WEB_IMAGE: elecshop-web
   SERVER_IMAGE: elecshop-server
 
@@ -44,9 +44,6 @@ jobs:
         run: pnpm turbo run test
         continue-on-error: true
 
-      - name: Build Workspace
-        run: pnpm turbo run build
-
       - name: Login to Azure Container Registry
         run: |
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }} \
@@ -56,7 +53,7 @@ jobs:
       - name: Build Web Docker Image
         run: |
           docker build \
-          -f web/dockerfile \
+          -f apps/web/dockerfile \
           -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
           -t $REGISTRY/$WEB_IMAGE:latest \
           .
@@ -69,7 +66,7 @@ jobs:
       - name: Build Server Docker Image
         run: |
           docker build \
-          -f server/dockerfile \
+          -f apps/server/dockerfile \
           -t $REGISTRY/$SERVER_IMAGE:${{ github.sha }} \
           -t $REGISTRY/$SERVER_IMAGE:latest \
           .
