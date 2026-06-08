@@ -1,4 +1,4 @@
-name: Build and Push Images
+name: CI/CD Pipeline
 
 on:
   push:
@@ -12,8 +12,13 @@ env:
   WEB_IMAGE: elecshop-web
   SERVER_IMAGE: elecshop-server
 
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1: CI — Lint & Test
+# Runs on every push. Fails hard so broken code never reaches build/deploy.
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
-  build-and-push:
+  ci:
+    name: Lint & Test
     runs-on: ubuntu-latest
 
     permissions:
@@ -44,42 +49,119 @@ jobs:
         run: pnpm turbo run test
         continue-on-error: true
 
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2: Build & Push to ACR — Staging
+# Triggered by pushes to the `staging` branch.
+# Tags images with :staging — App Service (staging slot) watches this tag
+# and auto-deploys via ACR continuous deployment webhook.
+# ─────────────────────────────────────────────────────────────────────────────
+  build-staging:
+    name: Build & Push (Staging)
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref_name == 'staging'
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Login to Azure Container Registry
         run: |
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }} \
-          --username "${{ secrets.AZURE_REGISTRY_USERNAME }}" \
-          --password-stdin
+            --username "${{ secrets.AZURE_REGISTRY_USERNAME }}" \
+            --password-stdin
 
-      - name: Build Web Docker Image
+      - name: Build & Push Web Image (staging)
         run: |
           docker build \
-          -f apps/web/dockerfile \
-          -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
-          -t $REGISTRY/$WEB_IMAGE:staging \
-          .
-
-      - name: Push Web Docker Image
-        run: |
+            -f apps/web/dockerfile \
+            -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
+            -t $REGISTRY/$WEB_IMAGE:staging \
+            .
           docker push $REGISTRY/$WEB_IMAGE:${{ github.sha }}
           docker push $REGISTRY/$WEB_IMAGE:staging
 
-      - name: Build Server Docker Image
+      - name: Build & Push Server Image (staging)
         run: |
           docker build \
-          -f apps/server/dockerfile \
-          -t $REGISTRY/$SERVER_IMAGE:${{ github.sha }} \
-          -t $REGISTRY/$SERVER_IMAGE:staging \
-          .
-
-      - name: Push Server Docker Image
-        run: |
+            -f apps/server/dockerfile \
+            -t $REGISTRY/$SERVER_IMAGE:${{ github.sha }} \
+            -t $REGISTRY/$SERVER_IMAGE:staging \
+            .
           docker push $REGISTRY/$SERVER_IMAGE:${{ github.sha }}
           docker push $REGISTRY/$SERVER_IMAGE:staging
 
-      - name: Display Published Images
+      - name: Summary
         run: |
-          echo "Published:"
-          echo "$REGISTRY/$WEB_IMAGE:${{ github.sha }}"
-          echo "$REGISTRY/$WEB_IMAGE:staging"
-          echo "$REGISTRY/$SERVER_IMAGE:${{ github.sha }}"
-          echo "$REGISTRY/$SERVER_IMAGE:staging"
+          echo "### Staging Images Pushed to ACR 🐳" >> $GITHUB_STEP_SUMMARY
+          echo "Azure App Service (staging) will auto-deploy via ACR webhook." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Tags |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`$REGISTRY/$WEB_IMAGE\` | \`${{ github.sha }}\`, \`staging\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`$REGISTRY/$SERVER_IMAGE\` | \`${{ github.sha }}\`, \`staging\` |" >> $GITHUB_STEP_SUMMARY
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 3: Build & Push to ACR — Production
+# Triggered by pushes to `main` only.
+# Pauses for manual approval (configure "Required reviewers" in
+# GitHub → Settings → Environments → production).
+# Tags images with :latest — App Service (production) watches this tag
+# and auto-deploys via ACR continuous deployment webhook.
+# ─────────────────────────────────────────────────────────────────────────────
+  build-production:
+    name: Build & Push (Production)
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref_name == 'main'
+
+    # This environment gate enforces manual approval before the job runs.
+    # Set up required reviewers at: Settings > Environments > production
+    environment:
+      name: production
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to Azure Container Registry
+        run: |
+          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }} \
+            --username "${{ secrets.AZURE_REGISTRY_USERNAME }}" \
+            --password-stdin
+
+      - name: Build & Push Web Image (production)
+        run: |
+          docker build \
+            -f apps/web/dockerfile \
+            -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
+            -t $REGISTRY/$WEB_IMAGE:latest \
+            .
+          docker push $REGISTRY/$WEB_IMAGE:${{ github.sha }}
+          docker push $REGISTRY/$WEB_IMAGE:latest
+
+      - name: Build & Push Server Image (production)
+        run: |
+          docker build \
+            -f apps/server/dockerfile \
+            -t $REGISTRY/$SERVER_IMAGE:${{ github.sha }} \
+            -t $REGISTRY/$SERVER_IMAGE:latest \
+            .
+          docker push $REGISTRY/$SERVER_IMAGE:${{ github.sha }}
+          docker push $REGISTRY/$SERVER_IMAGE:latest
+
+      - name: Summary
+        run: |
+          echo "### Production Images Pushed to ACR 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "Azure App Service (production) will auto-deploy via ACR webhook." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Tags |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`$REGISTRY/$WEB_IMAGE\` | \`${{ github.sha }}\`, \`latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`$REGISTRY/$SERVER_IMAGE\` | \`${{ github.sha }}\`, \`latest\` |" >> $GITHUB_STEP_SUMMARY
