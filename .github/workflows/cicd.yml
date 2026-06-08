@@ -44,9 +44,6 @@ jobs:
         run: pnpm turbo run test
         continue-on-error: true
 
-      - name: Build Workspace
-        run: pnpm turbo run build
-
       - name: Login to Azure Container Registry
         run: |
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }} \
