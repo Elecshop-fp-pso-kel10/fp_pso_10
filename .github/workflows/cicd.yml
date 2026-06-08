@@ -55,31 +55,31 @@ jobs:
           docker build \
           -f apps/web/dockerfile \
           -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
-          -t $REGISTRY/$WEB_IMAGE:latest \
+          -t $REGISTRY/$WEB_IMAGE:staging \
           .
 
       - name: Push Web Docker Image
         run: |
           docker push $REGISTRY/$WEB_IMAGE:${{ github.sha }}
-          docker push $REGISTRY/$WEB_IMAGE:latest
+          docker push $REGISTRY/$WEB_IMAGE:staging
 
       - name: Build Server Docker Image
         run: |
           docker build \
           -f apps/server/dockerfile \
           -t $REGISTRY/$SERVER_IMAGE:${{ github.sha }} \
-          -t $REGISTRY/$SERVER_IMAGE:latest \
+          -t $REGISTRY/$SERVER_IMAGE:staging \
           .
 
       - name: Push Server Docker Image
         run: |
           docker push $REGISTRY/$SERVER_IMAGE:${{ github.sha }}
-          docker push $REGISTRY/$SERVER_IMAGE:latest
+          docker push $REGISTRY/$SERVER_IMAGE:staging
 
       - name: Display Published Images
         run: |
           echo "Published:"
           echo "$REGISTRY/$WEB_IMAGE:${{ github.sha }}"
-          echo "$REGISTRY/$WEB_IMAGE:latest"
+          echo "$REGISTRY/$WEB_IMAGE:staging"
           echo "$REGISTRY/$SERVER_IMAGE:${{ github.sha }}"
-          echo "$REGISTRY/$SERVER_IMAGE:latest"
+          echo "$REGISTRY/$SERVER_IMAGE:staging"
