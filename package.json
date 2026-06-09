@@ -4,9 +4,8 @@
   "private": true,
   "packageManager": "pnpm@8.15.4",
   "workspaces": [
-    "client-old",
-    "server",
-    "web"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "build": "turbo run build",
