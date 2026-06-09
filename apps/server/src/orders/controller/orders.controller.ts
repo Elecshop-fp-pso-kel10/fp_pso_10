@@ -13,13 +13,46 @@ import { UserDocument } from '@/users/schemas/user.schema';
 import { CurrentUser } from '@/decorators/current-user.decorator';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 
+// Minimal shape for order creation body
+interface CreateOrderBody {
+  orderItems: {
+    productId: string;
+    name: string;
+    qty: number;
+    image: string;
+    price: number;
+  }[];
+  shippingAddress: {
+    address: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  };
+  paymentMethod: string;
+  itemsPrice: number;
+  taxPrice: number;
+  shippingPrice: number;
+  totalPrice: number;
+}
+
+// Payment result from Stripe/PayPal webhook
+interface PaymentResult {
+  id: string;
+  status: string;
+  update_time: string;
+  email_address: string;
+}
+
 @Controller('orders')
 export class OrdersController {
   constructor(private ordersService: OrdersService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async createOrder(@Body() body: any, @CurrentUser() user: UserDocument) {
+  async createOrder(
+    @Body() body: CreateOrderBody,
+    @CurrentUser() user: UserDocument,
+  ) {
     return this.ordersService.create(body, user._id.toString());
   }
 
@@ -45,7 +78,7 @@ export class OrdersController {
   @Put(':id/pay')
   async updateOrderPayment(
     @Param('id') id: string,
-    @Body() { paymentResult }: any,
+    @Body() { paymentResult }: { paymentResult: PaymentResult },
   ) {
     return this.ordersService.updatePaid(id, paymentResult);
   }

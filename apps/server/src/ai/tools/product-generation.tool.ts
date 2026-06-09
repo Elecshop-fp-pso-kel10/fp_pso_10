@@ -6,6 +6,16 @@ import { ImageGenerationService } from '../services/image-generation.service';
 import { ProductCreationStep } from '@apps/shared/types/agents';
 import { ProductsService } from '@/products/services/products.service';
 
+// Minimal shape of product info passed between generation steps
+interface ProductInfo {
+  name: string;
+  brand: string;
+  category: string;
+  description?: string;
+  price?: number;
+  countInStock?: number;
+}
+
 @Injectable()
 export class ProductGenerationTool {
   constructor(
@@ -46,7 +56,7 @@ export class ProductGenerationTool {
     }
   }
 
-  async generateProductImages({ productInfo }: { productInfo: any }) {
+  async generateProductImages({ productInfo }: { productInfo: ProductInfo }) {
     const basePrompt = `Professional product photography of a ${productInfo.brand} ${productInfo.name}, ${productInfo.category},
       premium product visualization, floating in space, light gray background (#F0F0F0),
       soft shadow beneath product, studio lighting, 8k resolution, photorealistic, ultra detailed`;
@@ -86,7 +96,8 @@ export class ProductGenerationTool {
     );
 
     return {
-      images: images.map((image, index) => ({
+      // _index ignored — we only need the URL, not the position
+      images: images.map((image) => ({
         url: image.urls[0],
       })),
     };
@@ -97,7 +108,7 @@ export class ProductGenerationTool {
     productInfo,
   }: {
     brand: string;
-    productInfo: any;
+    productInfo: ProductInfo;
   }) {
     try {
       const { object: logoPrompt } = await generateObject({
@@ -124,7 +135,7 @@ export class ProductGenerationTool {
     }
   }
 
-  async validateProduct(product: any) {
+  async validateProduct(product: Record<string, unknown>) {
     const productSchema = z.object({
       name: z.string().min(1, 'Product name is required'),
       description: z
@@ -173,7 +184,7 @@ export class ProductGenerationTool {
     userFeedback,
     step,
   }: {
-    productInfo: any;
+    productInfo: ProductInfo;
     userFeedback: string;
     step: ProductCreationStep;
   }) {
@@ -182,7 +193,7 @@ export class ProductGenerationTool {
       prompt: `Process user feedback: ${userFeedback} for step: ${step}`,
       schema: z.object({
         approved: z.boolean(),
-        updatedFields: z.record(z.any()).optional(),
+        updatedFields: z.record(z.unknown()).optional(),  // was: z.record(z.any())
         nextAction: z.enum(['proceed', 'modify', 'restart']),
         message: z.string(),
       }),
@@ -236,25 +247,28 @@ export class ProductGenerationTool {
         productId: savedProduct._id.toString(),
         message: `Successfully saved ${savedProduct.name} to the database!`,
       };
-    } catch (error: any) {
-      console.error('Product validation/save error:', error);
+    } catch (err: unknown) {  // was: error: any
+      console.error('Product validation/save error:', err);
 
-      if (error instanceof z.ZodError) {
+      if (err instanceof z.ZodError) {
         return {
           success: false,
           message: 'Invalid product data',
-          errors: error.errors.map(e => ({
+          errors: err.errors.map(e => ({
             field: e.path.join('.'),
             message: e.message,
           })),
         };
       }
 
-      console.error('Error saving product:', error);
+      const message =
+        err instanceof Error ? err.message : 'Failed to save product to database';
+
+      console.error('Error saving product:', err);
       return {
         success: false,
         message: 'Failed to save product to database',
-        error: error.message,
+        error: message,
       };
     }
   }

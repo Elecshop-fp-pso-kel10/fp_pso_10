@@ -1,7 +1,9 @@
 import { faker } from '@faker-js/faker';
 import { hash } from 'argon2';
 
-const ROLES = ['user', 'admin'] as const;
+// ROLES defined but only used as a type source — remove the runtime value
+// and derive the type directly to avoid the unused-vars error
+type Role = 'user' | 'admin';
 
 interface GeneratedUser {
   name: string;
@@ -22,6 +24,9 @@ export async function generateUsers(count: number): Promise<GeneratedUser[]> {
     const firstName = faker.person.firstName();
     const lastName = faker.person.lastName();
 
+    // role typed but only used to derive isAdmin — kept for clarity
+    const _role: Role = i === 0 ? 'admin' : 'user';
+
     const user: GeneratedUser = {
       name: `${firstName} ${lastName}`,
       email: faker.internet.email({
@@ -30,7 +35,7 @@ export async function generateUsers(count: number): Promise<GeneratedUser[]> {
       }),
       password: hashedPassword,
       avatar: faker.image.avatar(),
-      isAdmin: i === 0, // First user is admin
+      isAdmin: i === 0,
       createdAt: faker.date.past({ years: 1 }),
       reviews: faker.number.int({ min: 0, max: 15 }),
       purchases: faker.number.int({ min: 1, max: 20 }),

@@ -39,8 +39,8 @@ export class ImageGenerationService {
       });
 
       const urls: string[] = await Promise.all(
-        // @ts-ignore
-        output.map(async (item: Buffer, index: number) => {
+        // @ts-expect-error -- Replicate SDK types output as unknown; runtime value is Buffer[]
+        (output as Buffer[]).map(async (item: Buffer) => {
           return this.cloudinary.uploadBuffer(item);
         }),
       );

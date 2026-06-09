@@ -58,7 +58,7 @@ export class CartController {
   @Post('shipping')
   saveShipping(
     @Body() shippingDetails: SaveShippingDetailsDto,
-    @CurrentUser() user: UserDocument,
+    @CurrentUser() _user: UserDocument,  // user not needed — shipping is cart-scoped
   ) {
     return this.cartService.validateShippingDetails(shippingDetails);
   }
@@ -66,7 +66,7 @@ export class CartController {
   @Post('payment')
   savePaymentMethod(
     @Body() { paymentMethod }: SavePaymentMethodDto,
-    @CurrentUser() user: UserDocument,
+    @CurrentUser() _user: UserDocument,  // user not needed — payment method is cart-scoped
   ) {
     return this.cartService.validatePaymentMethod(paymentMethod);
   }
