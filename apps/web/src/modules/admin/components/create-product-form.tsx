@@ -8,7 +8,7 @@ import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
-import { useFormState as useActionState } from 'react-dom';
+import { useActionState } from 'react';
 import { createProduct } from '@/modules/products/actions/create-product';
 import { productSchema } from '@/modules/products/validation/product';
 import { ZodError } from 'zod';  // removed unused `z` type import
