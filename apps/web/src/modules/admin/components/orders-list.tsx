@@ -22,6 +22,15 @@ interface OrdersListProps {
   orders: Order[];
 }
 
+// order.user may be a populated User object or a bare ID string depending
+// on whether the API populated it. Extract a displayable label either way.
+function getUserLabel(user: Order['user']): string {
+  if (typeof user === 'object' && user !== null) {
+    return (user as { name?: string }).name ?? '[unknown]';
+  }
+  return String(user);
+}
+
 export function OrdersList({ orders }: OrdersListProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -64,7 +73,7 @@ export function OrdersList({ orders }: OrdersListProps) {
           {orders.map(order => (
             <TableRow key={order._id}>
               <TableCell className="font-medium">#{order._id}</TableCell>
-              <TableCell>{order.user}</TableCell>
+              <TableCell>{getUserLabel(order.user)}</TableCell>
               <TableCell>
                 {new Date(order.createdAt).toLocaleDateString()}
               </TableCell>
