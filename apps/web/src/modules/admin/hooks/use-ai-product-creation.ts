@@ -1,4 +1,4 @@
-import { useChat } from 'ai/react';
+import { useChat, Message } from 'ai/react';
 import { Product } from '@apps/shared/types';
 import { ProductCreationStep } from '@apps/shared/types/agents';
 import { useState } from 'react';
@@ -27,7 +27,8 @@ export function useAiProductCreation() {
           "I am a product creation assistant. Let's create a product together.",
       },
     ],
-    body: ({ messages }) => ({
+    // Type the destructured messages param explicitly to satisfy noImplicitAny
+    body: ({ messages }: { messages: Message[] }) => ({
       messages,
       data: {
         context: {
@@ -53,12 +54,14 @@ export function useAiProductCreation() {
       console.error('Chat error:', error);
     },
     onFinish: message => {
-      const data = message.data;
+      const data = message.data as {
+        productUpdate?: Partial<Product>;
+        canProgress?: boolean;
+      } | undefined;
       if (data?.productUpdate) {
         setProductDraft(prev => ({ ...prev, ...data.productUpdate }));
       }
       if (data?.canProgress) {
-        // Handle step progression based on your step order
         const stepOrder: ProductCreationStep[] = [
           'basic-info',
           'details',
