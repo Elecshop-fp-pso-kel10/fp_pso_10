@@ -13,7 +13,7 @@ export async function getProduct(id: string): Promise<Product | null> {
 
     return response.json();
   } catch (_error) {
-    console.error('Error fetching product:', error);
+    console.error('Error fetching product:', _error);
     return null;
   }
 }

@@ -22,6 +22,7 @@ export function ProductExpertInput({
   stop,
 }: ProductExpertInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -40,13 +41,15 @@ export function ProductExpertInput({
           variant: 'destructive',
         });
       } else {
-        handleSubmit(e);
+        // Programmatically submit the form so handleSubmit receives the
+        // correct FormEvent<HTMLFormElement> instead of a keyboard event
+        formRef.current?.requestSubmit();
       }
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative">
+    <form ref={formRef} onSubmit={handleSubmit} className="relative">
       <Textarea
         ref={textareaRef}
         value={input}

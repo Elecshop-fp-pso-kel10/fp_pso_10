@@ -33,7 +33,7 @@ function PayPalButtonWrapper({ orderId, amount }: PayPalButtonProps) {
     } catch (_error) {
       toast({
         title: 'Payment Error',
-        description: 'There was an error processing your payment.',
+        description: 'There was an _error processing your payment.',
         variant: 'destructive',
       });
     }

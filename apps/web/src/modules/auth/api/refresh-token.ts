@@ -17,8 +17,8 @@ export async function refreshToken() {
     }
     return response.data;
   } catch (_error) {
-    console.error('Refresh error:', error);
+    console.error('Refresh _error:', _error);
     queryClient.setQueryData(['user'], null);
-    throw error;
+    throw _error;
   }
 }
