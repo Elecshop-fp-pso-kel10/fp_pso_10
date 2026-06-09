@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - staging
   workflow_dispatch:
 
 env:
@@ -47,13 +46,19 @@ jobs:
         run: pnpm turbo run test
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 2: Build & Push to ACR — Staging
+# JOB 2: Build & Push to ACR with :staging tag
+# Runs after CI passes on every push to main.
+# Tags images with :<sha> and :staging.
+# App Service (staging slot) watches :staging and auto-deploys via ACR webhook.
 # ─────────────────────────────────────────────────────────────────────────────
-  build-staging:
-    name: Build & Push (Staging)
+  build-and-deploy-staging:
+    name: Build & Deploy to Staging
     runs-on: ubuntu-latest
     needs: ci
-    if: github.ref_name == 'staging'
+
+    environment:
+      name: staging
+      url: https://${{ vars.STAGING_WEB_APP_NAME }}.azurewebsites.net
 
     permissions:
       contents: read
@@ -90,7 +95,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "### Staging Images Pushed to ACR 🐳" >> $GITHUB_STEP_SUMMARY
+          echo "### Staging Images Pushed to ACR" >> $GITHUB_STEP_SUMMARY
           echo "Azure App Service (staging) will auto-deploy via ACR webhook." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Image | Tags |" >> $GITHUB_STEP_SUMMARY
@@ -100,16 +105,15 @@ jobs:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 3: Promote Staging → Production (retag only, no rebuild)
-# Uses the OCI Distribution HTTP API to copy the :staging manifest to :latest
-# entirely within ACR — no Docker build, no image transfer, no Azure CLI.
-# Only requires your existing ACR_USERNAME and ACR_PASSWORD secrets.
-# App Service (production) watches :latest and redeploys via ACR CD webhook.
+# Runs after staging deploy. Pauses for manual approval via GitHub Environment.
+# Set up required reviewers at: Settings > Environments > production
+# Uses ACR HTTP API to retag :staging → :latest server-side (no image transfer).
+# App Service (production) watches :latest and auto-deploys via ACR webhook.
 # ─────────────────────────────────────────────────────────────────────────────
   promote-production:
     name: Promote to Production (retag)
     runs-on: ubuntu-latest
-    needs: ci
-    if: github.ref_name == 'main'
+    needs: build-and-deploy-staging
 
     environment:
       name: production
@@ -118,31 +122,25 @@ jobs:
       contents: read
 
     steps:
-      # Retag by fetching the :staging manifest from the ACR HTTP API and
-      # pushing it back under the :latest tag. This is a pure metadata
-      # operation — no image layers are downloaded or uploaded.
       - name: Retag Web Image (staging → latest)
         run: |
-          # Get an OAuth token scoped to this image
           TOKEN=$(curl -s -u "${{ secrets.AZURE_REGISTRY_USERNAME }}:${{ secrets.AZURE_REGISTRY_PASSWORD }}" \
             "https://$REGISTRY/oauth2/token?service=$REGISTRY&scope=repository:$WEB_IMAGE:pull,push" \
             | jq -r '.access_token')
 
-          # Fetch the manifest for :staging (preserve exact Content-Type for multi-arch support)
           MANIFEST=$(curl -s -H "Authorization: Bearer $TOKEN" \
             -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://$REGISTRY/v2/$WEB_IMAGE/manifests/staging")
 
           MEDIA_TYPE=$(echo "$MANIFEST" | jq -r '.mediaType')
 
-          # Push the same manifest under :latest — no layer transfer
           curl -s -X PUT \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: $MEDIA_TYPE" \
             -d "$MANIFEST" \
             "https://$REGISTRY/v2/$WEB_IMAGE/manifests/latest"
 
-          echo "✅ $WEB_IMAGE: staging → latest"
+          echo "$WEB_IMAGE: staging → latest"
 
       - name: Retag Server Image (staging → latest)
         run: |
@@ -162,11 +160,11 @@ jobs:
             -d "$MANIFEST" \
             "https://$REGISTRY/v2/$SERVER_IMAGE/manifests/latest"
 
-          echo "✅ $SERVER_IMAGE: staging → latest"
+          echo "$SERVER_IMAGE: staging → latest"
 
       - name: Summary
         run: |
-          echo "### Production Promotion Complete 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "### Production Promotion Complete" >> $GITHUB_STEP_SUMMARY
           echo "No rebuild — \`staging\` manifests retagged to \`latest\` via ACR HTTP API." >> $GITHUB_STEP_SUMMARY
           echo "Azure App Service (production) will auto-deploy via ACR webhook." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
