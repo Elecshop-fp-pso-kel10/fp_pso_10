@@ -190,7 +190,7 @@ export function AiProductCreator() {
             <Button
               type="button"
               variant="outline"
-              onClick={reload}
+              onClick={() => reload()}
               disabled={isLoading || messages.length === 0}
             >
               Retry
