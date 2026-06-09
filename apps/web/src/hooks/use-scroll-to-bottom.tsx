@@ -1,8 +1,10 @@
 import { useEffect, useRef, RefObject } from 'react';
 
+// React 19 changed useRef<T>(null) to return RefObject<T | null>
+// Update the return type signature to match
 export function useScrollToBottom<T extends HTMLElement>(): [
-  RefObject<T>,
-  RefObject<T>,
+  RefObject<T | null>,
+  RefObject<T | null>,
 ] {
   const containerRef = useRef<T>(null);
   const endRef = useRef<T>(null);
