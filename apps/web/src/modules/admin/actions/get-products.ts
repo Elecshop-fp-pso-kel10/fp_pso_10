@@ -19,7 +19,7 @@ export async function getProducts(
     const data = (await response.json()) as PaginatedResponse<Product>;
     return data;
   } catch (_error) {
-    console._error('Error fetching products:', _error);
+    console.error('Error fetching products:', _error);
     return {
       items: [],
       total: 0,

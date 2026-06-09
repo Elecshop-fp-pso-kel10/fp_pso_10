@@ -30,7 +30,7 @@ export async function getProducts(
 
     return data;
   } catch (_error) {
-    console._error('Error fetching products:', _error);
+    console.error('Error fetching products:', _error);
     return {
       items: [],
       total: 0,

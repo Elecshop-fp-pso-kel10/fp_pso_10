@@ -18,7 +18,7 @@ export async function getUsers(
 
     return data;
   } catch (_error) {
-    console._error('Error fetching users:', _error);
+    console.error('Error fetching users:', _error);
     return {
       items: [],
       total: 0,
