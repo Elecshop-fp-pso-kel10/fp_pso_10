@@ -12,8 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { Loader2 } from 'lucide-react';
-import { useEffect } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
@@ -24,7 +23,13 @@ interface StripeButtonProps {
   amount: number;
 }
 
-function StripeForm({ orderId, amount }: StripeButtonProps) {
+// StripeForm only needs orderId — amount is used by the parent StripeButton
+// to create the PaymentIntent, not by the form itself
+interface StripeFormProps {
+  orderId: string;
+}
+
+function StripeForm({ orderId }: StripeFormProps) {  // was: { orderId, amount } — amount unused here
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
@@ -49,7 +54,6 @@ function StripeForm({ orderId, amount }: StripeButtonProps) {
       return;
     }
 
-    // Update order status
     await apiClient.put(`/orders/${orderId}/pay`, {
       id: paymentIntent.id,
       status: paymentIntent.status,
@@ -86,7 +90,6 @@ export function StripeButton({ orderId, amount }: StripeButtonProps) {
   const [clientSecret, setClientSecret] = useState<string>();
 
   useEffect(() => {
-    // Get payment intent
     fetch('/api/stripe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -107,7 +110,7 @@ export function StripeButton({ orderId, amount }: StripeButtonProps) {
 
   return (
     <Elements stripe={stripePromise} options={{ clientSecret }}>
-      <StripeForm orderId={orderId} amount={amount} />
+      <StripeForm orderId={orderId} />
     </Elements>
   );
 }

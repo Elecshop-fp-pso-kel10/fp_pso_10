@@ -20,7 +20,9 @@ export async function createProduct(
   formState: ProductResponseState,
   formData: FormData,
 ): Promise<ProductResponseState> {
-  const { images, ...restData } = data;
+  // `images` is intentionally excluded from server-side validation here
+  // because images come through formData directly; destructure to omit it
+  const { images: _images, ...restData } = data;  // was: images (flagged as unused)
   const validationSchema = productSchema.omit({ images: true });
   const result = validationSchema.safeParse(restData);
 
@@ -49,11 +51,11 @@ export async function createProduct(
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      const errorBody = await response.json() as { message?: string };
       return {
         error: {
           title: 'Error',
-          description: error.message || 'Failed to create product',
+          description: errorBody.message || 'Failed to create product',
         },
       };
     }
@@ -66,11 +68,13 @@ export async function createProduct(
         description: 'Product created successfully',
       },
     };
-  } catch (error: any) {
+  } catch (err: unknown) {  // was: error: any
+    const message =
+      err instanceof Error ? err.message : 'Failed to create product';
     return {
       error: {
         title: 'Error',
-        description: error.message || 'Failed to create product',
+        description: message,
       },
     };
   }

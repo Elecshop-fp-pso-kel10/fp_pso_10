@@ -5,10 +5,11 @@ import { queryClient } from '@/app/providers';
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (token: string) => void;
-  reject: (error: any) => void;
+  reject: (error: unknown) => void;  // was: any
 }> = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+// error param typed as unknown; cast only where response shape is needed
+const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach(prom => {
     if (error) {
       prom.reject(error);
@@ -19,7 +20,6 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Reset function for cleanup
 const resetRefreshState = () => {
   isRefreshing = false;
   failedQueue = [];
@@ -27,21 +27,19 @@ const resetRefreshState = () => {
 
 apiClient.interceptors.response.use(
   response => response,
-  async error => {
-    const originalRequest = error.config;
+  async (error: unknown) => {  // was: any
+    // Cast once to access axios-specific fields
+    const axiosError = error as {
+      config: { _retry?: boolean; url?: string };
+      response?: { status: number };
+    };
 
-    // // Skip refresh for auth endpoints
-    // const isAuthEndpoint = originalRequest.url?.includes('/auth/');
-    // if (isAuthEndpoint) {
-    //   return Promise.reject(error);
-    // }
+    const originalRequest = axiosError.config;
 
-    // If we're already retrying or it's not a 401, reject immediately
-    if (originalRequest._retry || error.response?.status !== 401) {
+    if (originalRequest._retry || axiosError.response?.status !== 401) {
       return Promise.reject(error);
     }
 
-    // Safety check - if we somehow got stuck
     if (isRefreshing) {
       console.warn('Refresh got stuck, resetting state');
       resetRefreshState();
@@ -57,9 +55,9 @@ apiClient.interceptors.response.use(
       await refreshToken();
       processQueue(null, 'refreshed');
       return apiClient(originalRequest);
-    } catch (error) {
+    } catch (refreshError: unknown) {  // was: _error (flagged) + referenced wrong var
       processQueue(error, null);
-      throw error;
+      throw refreshError;
     } finally {
       resetRefreshState();
     }

@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import Image from 'next/image';
+// removed: import Image from 'next/image' — was imported but never used
 
 interface ShippingFormData {
   address: string;
@@ -43,7 +43,7 @@ export function ShippingForm() {
       const shippingAddress = response.data;
       setShippingAddress(shippingAddress);
       router.push('/checkout/payment');
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error saving shipping details',
         description: 'Please try again.',

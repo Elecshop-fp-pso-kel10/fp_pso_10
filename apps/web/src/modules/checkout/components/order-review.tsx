@@ -48,7 +48,7 @@ export function OrderReview() {
 
       await clearCart();
       router.push(`/orders/${response.data._id}`);
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error placing order',
         description: 'Please try again.',

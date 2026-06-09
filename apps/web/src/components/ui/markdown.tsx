@@ -16,14 +16,18 @@ export const Markdown = memo(function Markdown({
       className={cn('prose dark:prose-invert max-w-none', className)}
       remarkPlugins={[remarkGfm]}
       components={{
-        code({ node, inline, className, children, ...props }) {
+        // react-markdown v8+ removed the `inline` prop.
+        // Block code has a language className; inline code does not.
+        // Do NOT spread ...props into SyntaxHighlighter — its ref type is
+        // incompatible with the HTMLElement ref that react-markdown passes.
+        code({ node: _node, className, children }) {
           const match = /language-(\w+)/.exec(className || '');
-          return !inline && match ? (
-            <SyntaxHighlighter language={match[1]} PreTag="div" {...props}>
+          return match ? (
+            <SyntaxHighlighter language={match[1]} PreTag="div">
               {String(children).replace(/\n$/, '')}
             </SyntaxHighlighter>
           ) : (
-            <code className={className} {...props}>
+            <code className={className}>
               {children}
             </code>
           );

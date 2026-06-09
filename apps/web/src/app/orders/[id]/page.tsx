@@ -1,7 +1,5 @@
 import { OrderDetails } from '@/modules/orders/components/order-details';
 import { Container } from '@/components/ui/container';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { fetchWithAuth } from '@/lib/fetch-with-auth';
 import { Order } from '@apps/shared/types/order';
 

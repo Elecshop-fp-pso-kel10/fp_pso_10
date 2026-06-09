@@ -48,7 +48,7 @@ export function PaymentForm() {
       console.log(paymentMethod);
       setPaymentMethod(paymentMethod);
       router.push('/checkout/review');
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error saving payment method',
         description: 'Please try again.',

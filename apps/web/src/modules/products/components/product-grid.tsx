@@ -43,7 +43,7 @@ export function ProductGrid({
           );
           setProducts(items);
           setPages(totalPages);
-        } catch (error) {
+        } catch (_error) {
           console.error('Failed to search products:', error);
         } finally {
           setIsLoading(false);

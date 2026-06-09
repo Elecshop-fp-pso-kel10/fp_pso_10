@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
 import { CartItem } from '@apps/shared/types/cart';
 import { apiClient } from '@/lib/api-client';
 import { useUser } from '@/modules/auth/hooks/use-user';
@@ -25,20 +31,121 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   const { toast } = useToast();
 
-  // Load initial cart data
+  // ── updateQuantity (defined before mergeCarts which depends on it) ──────────
+  const updateQuantity = useCallback(
+    async (productId: string, qty: number) => {
+      setLoading(true);
+      try {
+        if (user) {
+          const { data } = await apiClient.put(`/cart/items/${productId}`, {
+            qty,
+          });
+          setItems(data.items);
+        } else {
+          setItems(prev =>
+            prev.map(item =>
+              item.productId === productId ? { ...item, qty } : item,
+            ),
+          );
+        }
+      } catch {
+        console.error('Error updating cart item');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user],
+  );
+
+  // ── addItem ─────────────────────────────────────────────────────────────────
+  const addItem = useCallback(
+    async (productId: string, qty: number) => {
+      setLoading(true);
+      try {
+        if (user) {
+          const { data } = await apiClient.post('/cart/items', {
+            productId,
+            qty,
+          });
+          setItems(data.items);
+          toast({
+            title: 'Item added to cart',
+            description: 'Your item has been added to your cart successfully.',
+          });
+        } else {
+          const response = await apiClient.get(`/products/${productId}`);
+          const product = response.data;
+
+          setItems(prev => {
+            const existingItem = prev.find(
+              item => item.productId === productId,
+            );
+            if (existingItem) {
+              return prev.map(item =>
+                item.productId === productId ? { ...item, qty } : item,
+              );
+            }
+            const newItem: CartItem = {
+              productId: product._id,
+              name: product.name,
+              image: product.images[0],
+              price: product.price,
+              countInStock: product.countInStock,
+              qty,
+            };
+            return [...prev, newItem];
+          });
+          toast({
+            title: 'Item added to cart',
+            description: 'Your item has been saved to your local cart.',
+          });
+        }
+      } catch {
+        toast({
+          title: 'Error adding item',
+          description: 'There was a problem adding your item to the cart.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user, toast],
+  );
+
+  // ── mergeCarts ───────────────────────────────────────────────────────────────
+  const mergeCarts = useCallback(
+    async (localItems: CartItem[], serverItems: CartItem[]) => {
+      const serverItemsMap = new Map(
+        serverItems.map(item => [item.productId, item]),
+      );
+
+      for (const localItem of localItems) {
+        const serverItem = serverItemsMap.get(localItem.productId);
+        if (serverItem) {
+          await updateQuantity(
+            localItem.productId,
+            Math.max(localItem.qty, serverItem.qty),
+          );
+        } else {
+          await addItem(localItem.productId, localItem.qty);
+        }
+      }
+    },
+    [updateQuantity, addItem],
+  );
+
+  // ── Load cart on mount / user change ────────────────────────────────────────
   useEffect(() => {
     const loadCart = async () => {
       setLoading(true);
       try {
         if (user) {
-          // Get local cart before fetching server cart
           const localCart = localStorage.getItem(CART_STORAGE_KEY);
           const localItems = localCart ? JSON.parse(localCart) : [];
 
-          // Fetch server cart
           const { data } = await apiClient.get('/cart');
 
-          // If we have local items and just logged in, merge carts
           if (localItems.length > 0) {
             toast({
               title: 'Syncing your cart...',
@@ -49,89 +156,34 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
               title: 'Cart synced!',
               description: 'Your items have been saved to your account.',
             });
-            // Clear local storage after successful merge
             localStorage.removeItem(CART_STORAGE_KEY);
           } else {
             setItems(data.items);
           }
         } else {
-          // Load cart from localStorage for guests
           const storedCart = localStorage.getItem(CART_STORAGE_KEY);
           if (storedCart) {
             setItems(JSON.parse(storedCart));
           }
         }
-      } catch (error) {
-        console.error('Error loading cart:', error);
+      } catch {
+        console.error('Error loading cart');
       } finally {
         setLoading(false);
       }
     };
 
     loadCart();
-  }, [user]);
+  }, [user, mergeCarts, toast]); // deps now complete — no warning
 
-  // Sync cart to localStorage for guests
+  // ── Sync guest cart to localStorage ─────────────────────────────────────────
   useEffect(() => {
     if (!user) {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
     }
   }, [items, user]);
 
-  const addItem = async (productId: string, qty: number) => {
-    setLoading(true);
-    try {
-      if (user) {
-        // Add to server cart for authenticated users
-        const { data } = await apiClient.post('/cart/items', {
-          productId,
-          qty,
-        });
-        setItems(data.items);
-        toast({
-          title: 'Item added to cart',
-          description: 'Your item has been added to your cart successfully.',
-        });
-      } else {
-        // Add to local cart for guests
-        const response = await apiClient.get(`/products/${productId}`);
-        const product = response.data;
-
-        const existingItem = items.find(item => item.productId === productId);
-        if (existingItem) {
-          setItems(
-            items.map(item =>
-              item.productId === productId ? { ...item, qty: qty } : item,
-            ),
-          );
-        } else {
-          const newItem: CartItem = {
-            productId: product._id,
-            name: product.name,
-            image: product.images[0],
-            price: product.price,
-            countInStock: product.countInStock,
-            qty,
-          };
-          setItems([...items, newItem]);
-        }
-        toast({
-          title: 'Item added to cart',
-          description: 'Your item has been saved to your local cart.',
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Error adding item',
-        description: 'There was a problem adding your item to the cart.',
-        variant: 'destructive',
-      });
-      console.error('Error adding item to cart:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ── removeItem ───────────────────────────────────────────────────────────────
   const removeItem = async (productId: string) => {
     setLoading(true);
     try {
@@ -145,7 +197,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         title: 'Item removed',
         description: 'The item has been removed from your cart.',
       });
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error removing item',
         description: 'There was a problem removing the item from your cart.',
@@ -156,28 +208,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateQuantity = async (productId: string, qty: number) => {
-    setLoading(true);
-    try {
-      if (user) {
-        const { data } = await apiClient.put(`/cart/items/${productId}`, {
-          qty,
-        });
-        setItems(data.items);
-      } else {
-        setItems(
-          items.map(item =>
-            item.productId === productId ? { ...item, qty } : item,
-          ),
-        );
-      }
-    } catch (error) {
-      console.error('Error updating cart item:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ── clearCart ────────────────────────────────────────────────────────────────
   const clearCart = async () => {
     setLoading(true);
     try {
@@ -189,7 +220,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         title: 'Cart cleared',
         description: 'All items have been removed from your cart.',
       });
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error clearing cart',
         description: 'There was a problem clearing your cart.',
@@ -197,31 +228,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const mergeCarts = async (
-    localItems: CartItem[],
-    serverItems: CartItem[],
-  ) => {
-    // Create a map of server items for quick lookup
-    const serverItemsMap = new Map(
-      serverItems.map(item => [item.productId, item]),
-    );
-
-    // Merge local items with server items
-    for (const localItem of localItems) {
-      const serverItem = serverItemsMap.get(localItem.productId);
-      if (serverItem) {
-        // If item exists in both carts, take the higher quantity
-        await updateQuantity(
-          localItem.productId,
-          Math.max(localItem.qty, serverItem.qty),
-        );
-      } else {
-        // If item only exists locally, add it to server cart
-        await addItem(localItem.productId, localItem.qty);
-      }
     }
   };
 

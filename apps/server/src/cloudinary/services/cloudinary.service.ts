@@ -15,7 +15,8 @@ export class CloudinaryService {
             console.error('Cloudinary upload error:', error);
             return reject(error);
           }
-          resolve(result as any);
+          // result is UploadApiResponse when no error — cast is safe here
+          resolve(result as UploadApiResponse);
         },
       );
 

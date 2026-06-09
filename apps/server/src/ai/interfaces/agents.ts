@@ -29,7 +29,9 @@ export interface AgentAction {
     | 'UPDATE_PRODUCT'
     | 'COMPLETE';
   message: string;
-  payload: any;
+  // payload can carry arbitrary structured data from the AI — unknown is safe
+  // and callers must narrow the type before using it
+  payload: unknown;
   validationErrors?: ValidationError[];
   choices?: string[];
   productUpdate?: Partial<Product>;

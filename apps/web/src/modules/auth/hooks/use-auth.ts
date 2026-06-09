@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '../api/auth-api';
 import { toast } from '@/hooks/use-toast';
 
+// Axios errors carry response data under .response.data — type it explicitly
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 export function useLogin() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -19,7 +28,7 @@ export function useLogin() {
         description: `Signed in as ${data.user.email}`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {  // was: any
       toast({
         variant: 'destructive',
         title: 'Oops!',
@@ -40,10 +49,10 @@ export function useRegister() {
       router.push('/');
       toast({
         title: 'Welcome!',
-        description: `Account created successfully`,
+        description: 'Account created successfully',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {  // was: any
       toast({
         variant: 'destructive',
         title: 'Oops!',
@@ -65,7 +74,7 @@ export function useLogout() {
         description: 'You have been signed out',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {  // was: any
       toast({
         variant: 'destructive',
         title: 'Oops!',

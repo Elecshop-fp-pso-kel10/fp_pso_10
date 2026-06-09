@@ -10,7 +10,9 @@ export async function fetchWithAuth(
   url: string,
   config: FetchWithAuthConfig = {},
 ) {
-  const { revalidatePaths, headers, ...rest } = config;
+  // revalidatePaths is accepted in the config interface for future use
+  // but not applied here — destructure with _ to satisfy ESLint
+  const { revalidatePaths: _revalidatePaths, headers, ...rest } = config;
   const accessToken = await getAccessToken();
 
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${url}`, {

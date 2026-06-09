@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     });
 
     return Response.json({ clientSecret: paymentIntent.client_secret });
-  } catch (error) {
+  } catch (_error) {
     return Response.json(
       { error: 'Error creating payment intent' },
       { status: 500 },

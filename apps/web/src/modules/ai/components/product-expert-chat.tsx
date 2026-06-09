@@ -1,17 +1,17 @@
 'use client';
 
 import { useChat } from 'ai/react';
-import { useRef, useState } from 'react';
 import { Message } from './message';
 import { ProductExpertInput } from './product-expert-input';
-import { Attachment } from 'ai';
 import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
+
+// `useRef` and `Attachment`/`attachments` state removed — not used by this component.
+// If attachment support is added later, re-import useRef, Attachment, and useState.
 
 export default function ProductExpertChat() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
     useChat({
       api: `${process.env.NEXT_PUBLIC_API_URL}/products/agent/chat`,
-
       initialMessages: [
         {
           id: '1',
@@ -24,8 +24,6 @@ export default function ProductExpertChat() {
 
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
-
-  const [attachments, setAttachments] = useState<Array<Attachment>>([]);
 
   return (
     <div className="flex flex-col h-[600px] rounded-lg border bg-background">
@@ -45,7 +43,7 @@ export default function ProductExpertChat() {
         <div
           ref={messagesEndRef}
           className="shrink-0 min-w-[24px] min-h-[24px]"
-        />{' '}
+        />
       </div>
 
       <div className="border-t p-4">

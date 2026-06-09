@@ -11,8 +11,6 @@ import {
   PaginationEllipsis,
 } from '@/components/ui/pagination';
 import { getVisiblePages } from '@/lib/utils';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 
 interface AdminProductsPageProps {
   searchParams: { page?: string };

@@ -8,11 +8,15 @@ import { useAiProductCreation } from '../hooks/use-ai-product-creation';
 import { Card } from '@/components/ui/card';
 import { formatPrice } from '@/lib/utils';
 
+// Shape of extra data attached to AI messages
+interface MessageData {
+  validationErrors?: { message: string }[];
+}
+
 function formatProductInfo(content: string) {
   console.log(content);
 
   if (content.includes('Brand:') && content.includes('Category:')) {
-    // Split content into product info and follow-up message
     const [productInfo, ...followUpParts] = content.split(
       /(?=Next,|Would you like|Let's)/i,
     );
@@ -25,7 +29,6 @@ function formatProductInfo(content: string) {
 
     return (
       <div className="space-y-4">
-        {/* Product Information */}
         <div className="space-y-3">
           <div className="font-medium">{lines[0].split(':')[0]}</div>
 
@@ -81,7 +84,6 @@ function formatProductInfo(content: string) {
           </div>
         </div>
 
-        {/* Follow-up Message */}
         {followUpMessage && (
           <div className="text-sm text-muted-foreground border-t pt-3">
             {followUpMessage}
@@ -106,10 +108,8 @@ export function AiProductCreator() {
     stop,
   } = useAiProductCreation();
 
-  // Add ref for chat container
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop =
@@ -119,45 +119,48 @@ export function AiProductCreator() {
 
   return (
     <div className="flex flex-col h-[600px]">
-      {/* Messages Container */}
       <Card className="flex-1 overflow-hidden flex flex-col">
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
         >
-          {messages.map(message => (
-            <div
-              key={message.id}
-              className={cn(
-                'max-w-[80%] rounded-lg p-4 animate-slide-in',
-                message.role === 'assistant'
-                  ? 'bg-muted ml-4'
-                  : 'bg-primary/10 ml-auto',
-              )}
-            >
-              <div className="text-sm font-medium mb-1 text-muted-foreground">
-                {message.role === 'assistant' ? 'AI Assistant' : 'You'}
-              </div>
-              {formatProductInfo(message.content)}
+          {messages.map(message => {
+            // Cast message.data (JSONValue) to our known shape
+            const data = message.data as MessageData | undefined;
 
-              {message.data?.validationErrors && (
-                <ul className="mt-2 space-y-1">
-                  {message.data.validationErrors.map((error, i) => (
-                    <li
-                      key={i}
-                      className="text-destructive text-sm flex items-center gap-2"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                      {error.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+            return (
+              <div
+                key={message.id}
+                className={cn(
+                  'max-w-[80%] rounded-lg p-4 animate-slide-in',
+                  message.role === 'assistant'
+                    ? 'bg-muted ml-4'
+                    : 'bg-primary/10 ml-auto',
+                )}
+              >
+                <div className="text-sm font-medium mb-1 text-muted-foreground">
+                  {message.role === 'assistant' ? 'AI Assistant' : 'You'}
+                </div>
+                {formatProductInfo(message.content)}
+
+                {data?.validationErrors && (
+                  <ul className="mt-2 space-y-1">
+                    {data.validationErrors.map((err, i) => (
+                      <li
+                        key={i}
+                        className="text-destructive text-sm flex items-center gap-2"
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                        {err.message}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Input Form */}
         <div className="p-4 border-t bg-background">
           {error && (
             <div className="mb-4 text-destructive text-sm p-2 rounded bg-destructive/10">

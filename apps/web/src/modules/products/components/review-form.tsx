@@ -10,6 +10,15 @@ interface ReviewFormProps {
   onSuccess: () => void;
 }
 
+// Axios error shape used in catch block
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -53,10 +62,12 @@ export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
       setRating(0);
       setComment('');
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {  // was: any
+      const apiError = error as ApiError;
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to submit review',
+        description:
+          apiError.response?.data?.message || 'Failed to submit review',
         variant: 'destructive',
       });
     } finally {

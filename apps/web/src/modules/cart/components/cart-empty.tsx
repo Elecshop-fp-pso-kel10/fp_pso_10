@@ -12,7 +12,7 @@ export function CartEmpty() {
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-semibold">Your cart is empty</h2>
         <p className="text-muted-foreground">
-          Looks like you haven't added anything to your cart yet
+          Looks like you haven&apos;t added anything to your cart yet
         </p>
       </div>
 

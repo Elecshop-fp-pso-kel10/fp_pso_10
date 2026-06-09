@@ -102,6 +102,11 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1",
+      "^src/(.*)$": "<rootDir>/$1",
+      "^@apps/shared/(.*)$": "<rootDir>/../../packages/shared/src/$1"
+    }
   }
 }

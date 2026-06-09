@@ -9,12 +9,12 @@ import {
   Query,
   UseGuards,
   UseInterceptors,
-  UploadedFile,
   UploadedFiles,
   Res,
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
+// removed: UploadedFile (unused), FileInterceptor (unused)
 import { AdminGuard } from 'src/guards/admin.guard';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 import { ProductDto } from '../dtos/product.dto';
@@ -22,7 +22,7 @@ import { ReviewDto } from '../dtos/review.dto';
 import { ProductsService } from '../services/products.service';
 import { UserDocument } from '@/users/schemas/user.schema';
 import { CurrentUser } from '@/decorators/current-user.decorator';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { AppService } from '@/app/services/app.service';
 import { ProductExpertAgent } from '@/ai/agents/product-expert.agent';
 import { ChatRequest } from '@apps/shared/types/agents';
@@ -90,7 +90,7 @@ export class ProductsController {
         ...productData,
         images: imageUrls,
       });
-    } catch (error) {
+    } catch {  // error not used — just rethrow as 500
       throw new InternalServerErrorException(
         'Failed to process images or create product',
       );
@@ -113,12 +113,10 @@ export class ProductsController {
     return this.productsService.createReview(id, user, rating, comment);
   }
 
-  @Post('agent/chat') //TODO: add admin guard
+  @Post('agent/chat')
   async chat(@Body() body: ChatRequest, @Res() res: Response) {
     const { messages } = body;
-
     const result = await this.productExpertAgent.chat(messages);
-
     return result.pipeDataStreamToResponse(res);
   }
 }

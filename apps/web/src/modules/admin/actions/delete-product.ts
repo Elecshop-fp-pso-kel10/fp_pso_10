@@ -19,7 +19,7 @@ export async function deleteProduct(productId: string) {
       success: true,
       message: 'Product deleted successfully',
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       success: false,
       message: 'Failed to delete product',

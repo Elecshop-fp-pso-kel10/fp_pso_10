@@ -47,7 +47,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
 
     try {
       await addItem(product._id, quantity);
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to add item to cart. Please try again.',

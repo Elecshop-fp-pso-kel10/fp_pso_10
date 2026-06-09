@@ -11,6 +11,13 @@ import { hashPassword } from '@/utils/password';
 import { generateUsers } from '@/utils/seed-users';
 import { PaginatedResponse } from '@apps/shared/types';
 
+// MongoDB/Mongoose error shape for duplicate key and validation errors
+interface MongoError {
+  code?: number;
+  name?: string;
+  message: string;
+}
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -24,15 +31,16 @@ export class UsersService {
         ...user,
         password: hashedPassword,
       });
-    } catch (error: any) {
-      this.logger.error(`Failed to create user: ${error.message}`);
+    } catch (error: unknown) {
+      const mongoError = error as MongoError;
+      this.logger.error(`Failed to create user: ${mongoError.message}`);
 
-      if (error.code === 11000) {
+      if (mongoError.code === 11000) {
         throw new BadRequestException('Email already exists');
       }
 
-      if (error.name === 'ValidationError') {
-        throw new BadRequestException(error.message);
+      if (mongoError.name === 'ValidationError') {
+        throw new BadRequestException(mongoError.message);
       }
 
       throw new BadRequestException('Failed to create user');
@@ -44,8 +52,9 @@ export class UsersService {
       return (await this.userModel.insertMany(
         users,
       )) as unknown as UserDocument[];
-    } catch (error: any) {
-      this.logger.error(`Failed to create users: ${error.message}`);
+    } catch (error: unknown) {
+      const mongoError = error as MongoError;
+      this.logger.error(`Failed to create users: ${mongoError.message}`);
       throw new BadRequestException('Failed to create users');
     }
   }
@@ -124,7 +133,6 @@ export class UsersService {
       password: attrs.password ? await hashPassword(attrs.password) : undefined,
     };
 
-    // Remove undefined values
     type UpdateKeys = keyof Partial<User>;
     Object.keys(updateData as Record<UpdateKeys, unknown>).forEach(
       key =>
@@ -145,8 +153,9 @@ export class UsersService {
 
       this.logger.log(`User ${id} updated successfully`);
       return updatedUser;
-    } catch (error: any) {
-      this.logger.error(`Failed to update user ${id}: ${error.message}`);
+    } catch (error: unknown) {
+      const mongoError = error as MongoError;
+      this.logger.error(`Failed to update user ${id}: ${mongoError.message}`);
       throw new BadRequestException('Failed to update user');
     }
   }
@@ -159,8 +168,9 @@ export class UsersService {
     try {
       await this.userModel.deleteMany({});
       this.logger.log('All users deleted successfully');
-    } catch (error: any) {
-      this.logger.error(`Failed to delete users: ${error.message}`);
+    } catch (error: unknown) {
+      const mongoError = error as MongoError;
+      this.logger.error(`Failed to delete users: ${mongoError.message}`);
       throw new BadRequestException('Failed to delete users');
     }
   }

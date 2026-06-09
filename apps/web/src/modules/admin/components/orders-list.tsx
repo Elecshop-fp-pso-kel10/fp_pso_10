@@ -34,7 +34,7 @@ export function OrdersList({ orders }: OrdersListProps) {
         description: 'Order marked as delivered',
       });
       router.refresh();
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to mark order as delivered',

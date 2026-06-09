@@ -12,6 +12,8 @@ import { OrdersService } from '../services/orders.service';
 import { UserDocument } from '@/users/schemas/user.schema';
 import { CurrentUser } from '@/decorators/current-user.decorator';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
+import { Order } from '../schemas/order.schema';
+import { PaymentResult } from 'src/interfaces';
 
 @Controller('orders')
 export class OrdersController {
@@ -19,7 +21,12 @@ export class OrdersController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async createOrder(@Body() body: any, @CurrentUser() user: UserDocument) {
+  async createOrder(
+    // Body matches Partial<Order> which is what the service expects.
+    // The client sends productId as a string; Mongoose coerces it to ObjectId at save time.
+    @Body() body: Partial<Order>,
+    @CurrentUser() user: UserDocument,
+  ) {
     return this.ordersService.create(body, user._id.toString());
   }
 
@@ -45,7 +52,7 @@ export class OrdersController {
   @Put(':id/pay')
   async updateOrderPayment(
     @Param('id') id: string,
-    @Body() { paymentResult }: any,
+    @Body() { paymentResult }: { paymentResult: PaymentResult },
   ) {
     return this.ordersService.updatePaid(id, paymentResult);
   }
