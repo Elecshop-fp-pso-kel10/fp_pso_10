@@ -180,7 +180,7 @@ export class ProductGenerationTool {
   }
 
   async handleUserApproval({
-    productInfo,
+    productInfo: _productInfo,  // received for context but prompt uses userFeedback and step only
     userFeedback,
     step,
   }: {
