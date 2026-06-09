@@ -58,7 +58,7 @@ jobs:
 
     environment:
       name: staging
-      url: https://${{ secrets.STAGING_WEB_APP_NAME }}.azurewebsites.net
+      url: https://${{ vars.STAGING_WEB_APP_NAME }}.azurewebsites.net
 
     permissions:
       contents: read
