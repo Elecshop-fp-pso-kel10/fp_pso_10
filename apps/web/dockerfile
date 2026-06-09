@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/server/package.json ./apps/server/
-COPY apps/shared/package.json ./apps/shared/
+COPY packages/shared/package.json ./packages/shared/
 
 RUN pnpm install --frozen-lockfile
 
@@ -19,21 +19,24 @@ RUN pnpm turbo run build --filter=@elecshop/web
 # ─── Stage 2: Runner ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
-RUN corepack enable
-
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy only what next start needs: the built output and its dependencies
+# Copy the built Next.js output
 COPY --from=builder /app/apps/web/.next ./.next
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/package.json ./package.json
 COPY --from=builder /app/apps/web/next.config.js ./next.config.js
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/shared ./apps/shared
+
+# Copy node_modules from the web app (contains next binary)
+COPY --from=builder /app/apps/web/node_modules ./node_modules
+
+# Copy shared packages needed at runtime
+COPY --from=builder /app/packages ./packages
 
 EXPOSE 3000
 
+# Use local next binary directly
 CMD ["node_modules/.bin/next", "start"]
