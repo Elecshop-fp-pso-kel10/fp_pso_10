@@ -125,7 +125,7 @@ Add Environment Variables - Server
 </details>
 
 Start the server
-
+test
 ```bash
 pnpm start:server
 ```
