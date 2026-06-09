@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - main
+      - staging
   workflow_dispatch:
 
 env:
-  REGISTRY: ""
+  REGISTRY: "AZURE_REGISTRY_LOGIN_SERVER"
   WEB_IMAGE: elecshop-web
   SERVER_IMAGE: elecshop-server
 
