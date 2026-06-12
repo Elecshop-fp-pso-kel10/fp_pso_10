@@ -82,6 +82,7 @@ jobs:
       - name: Build & Push Web Image
         run: |
           docker build \
+            --build-arg NEXT_PUBLIC_API_URL=https://${{ vars.STAGING_SERVER_APP_NAME }}.azurewebsites.net/v1 \
             -f apps/web/dockerfile \
             -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
             -t $REGISTRY/$WEB_IMAGE:staging \
