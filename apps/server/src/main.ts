@@ -1,5 +1,3 @@
-// dotenv is only needed locally; Azure injects env vars at runtime
-try { require('dotenv/config'); } catch { /* running in production – no dotenv needed */ }
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
