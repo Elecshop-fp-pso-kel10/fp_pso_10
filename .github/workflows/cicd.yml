@@ -107,14 +107,14 @@ jobs:
         with:
           app-name: ${{ vars.STAGING_WEB_APP_NAME }}
           publish-profile: ${{ secrets.STAGING_WEB_PUBLISH_PROFILE }}
-          images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:staging
+          images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:${{ github.sha }}
 
       - name: Deploy Server Image to Staging App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.STAGING_SERVER_APP_NAME }}
           publish-profile: ${{ secrets.STAGING_SERVER_PUBLISH_PROFILE }}
-          images: ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE }}:staging
+          images: ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE }}:${{ github.sha }}
 
       - name: Summary
         run: |
