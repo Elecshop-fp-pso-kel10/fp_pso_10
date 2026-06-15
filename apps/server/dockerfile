@@ -19,20 +19,16 @@ RUN pnpm turbo run build --filter=@elecshop/server
 # ─── Stage 2: Runner ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
-RUN corepack enable
-
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=5000
 
-# Copy compiled NestJS output and dependencies
+# Do NOT hardcode PORT — Azure App Service injects its own PORT at runtime.
+# main.ts already handles: const port = process.env.PORT || 4000
+EXPOSE 5000
+
 COPY --from=builder /app/apps/server/dist ./dist
-COPY --from=builder /app/apps/server/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/shared ./apps/shared
 
-EXPOSE 5000
-
-# Run compiled output directly — no webpack, no nest start
 CMD ["node", "dist/main.js"]

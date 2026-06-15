@@ -5,7 +5,7 @@ import { MongooseModuleOptions } from '@nestjs/mongoose';
 export const connectDB = (
   configService: ConfigService,
 ): MongooseModuleOptions => ({
-  uri: configService.get<string>('MONGODB_URI'),
+  uri: configService.get<string>('MONGODB_URI') || configService.get<string>('MONGODB_URL'),
   autoIndex: true,
 });
 

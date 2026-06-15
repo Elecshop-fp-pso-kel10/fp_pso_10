@@ -14,26 +14,27 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN pnpm turbo run build --filter=@elecshop/web
 
 # ─── Stage 2: Runner ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
-RUN corepack enable
-
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
 
-# Copy only what next start needs: the built output and its dependencies
-COPY --from=builder /app/apps/web/.next ./.next
-COPY --from=builder /app/apps/web/public ./public
-COPY --from=builder /app/apps/web/package.json ./package.json
-COPY --from=builder /app/apps/web/next.config.js ./next.config.js
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/shared ./apps/shared
+# Copy standalone output (self-contained, includes all needed node_modules)
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
 
-CMD ["node_modules/.bin/next", "start"]
+# PORT is injected by Azure App Service at runtime; default to 3000 locally
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["node", "apps/web/server.js"]

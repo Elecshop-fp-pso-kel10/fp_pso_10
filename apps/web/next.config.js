@@ -28,6 +28,10 @@ export default nextConfig;
 const nextConfig = {
   transpilePackages: ['@apps/shared'],
 
+  // Required for Docker / Azure App Service deployment
+  // Generates a self-contained build in .next/standalone
+  output: 'standalone',
+
   experimental: {
     externalDir: true,
   },

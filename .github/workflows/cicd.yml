@@ -6,8 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+    
 env:
-  REGISTRY: ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}
+  REGISTRY: ${{secrets.AZURE_REGISTRY_LOGIN_SERVER}}
   WEB_IMAGE: elecshop-web
   SERVER_IMAGE: elecshop-server
 
@@ -46,10 +47,16 @@ jobs:
         run: pnpm turbo run test
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 2: Build & Push to ACR with :staging tag
-# Runs after CI passes on every push to main.
-# Tags images with :<sha> and :staging.
-# App Service (staging slot) watches :staging and auto-deploys via ACR webhook.
+# JOB 2: Build & Push to ACR, then deploy to Staging via Publish Profile.
+# No service principal, no deployment slots needed.
+#
+# Required GitHub Secrets (global):
+#   AZURE_REGISTRY_LOGIN_SERVER, AZURE_REGISTRY_USERNAME, AZURE_REGISTRY_PASSWORD
+#   STAGING_WEB_PUBLISH_PROFILE   ← download from Azure Portal (see walkthrough)
+#   STAGING_SERVER_PUBLISH_PROFILE
+#
+# Required GitHub Variables (environment: staging):
+#   STAGING_WEB_APP_NAME, STAGING_SERVER_APP_NAME
 # ─────────────────────────────────────────────────────────────────────────────
   build-and-deploy-staging:
     name: Build & Deploy to Staging
@@ -58,7 +65,7 @@ jobs:
 
     environment:
       name: staging
-      url: https://${{ vars.STAGING_WEB_APP_NAME }}.azurewebsites.net
+      url: ${{ vars.STAGING_WEB_URL }}
 
     permissions:
       contents: read
@@ -76,6 +83,7 @@ jobs:
       - name: Build & Push Web Image
         run: |
           docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ vars.STAGING_API_URL }} \
             -f apps/web/dockerfile \
             -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
             -t $REGISTRY/$WEB_IMAGE:staging \
@@ -93,22 +101,41 @@ jobs:
           docker push $REGISTRY/$SERVER_IMAGE:${{ github.sha }}
           docker push $REGISTRY/$SERVER_IMAGE:staging
 
+      # ── Deploy via Publish Profile (no service principal needed) ─────────────
+      - name: Deploy Web Image to Staging App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.STAGING_WEB_APP_NAME }}
+          publish-profile: ${{ secrets.STAGING_WEB_PUBLISH_PROFILE }}
+          images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:${{ github.sha }}
+
+      - name: Deploy Server Image to Staging App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.STAGING_SERVER_APP_NAME }}
+          publish-profile: ${{ secrets.STAGING_SERVER_PUBLISH_PROFILE }}
+          images: ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE }}:${{ github.sha }}
+
       - name: Summary
         run: |
-          echo "### Staging Images Pushed to ACR" >> $GITHUB_STEP_SUMMARY
-          echo "Azure App Service (staging) will auto-deploy via ACR webhook." >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Staging Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "Images pushed to ACR and deployed via Publish Profile." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | Tags |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|------|" >> $GITHUB_STEP_SUMMARY
-          echo "| \`$REGISTRY/$WEB_IMAGE\` | \`${{ github.sha }}\`, \`staging\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| \`$REGISTRY/$SERVER_IMAGE\` | \`${{ github.sha }}\`, \`staging\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| App Service | Image |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ vars.STAGING_WEB_APP_NAME }}\` | \`$REGISTRY/$WEB_IMAGE:staging\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ vars.STAGING_SERVER_APP_NAME }}\` | \`$REGISTRY/$SERVER_IMAGE:staging\` |" >> $GITHUB_STEP_SUMMARY
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 3: Promote Staging → Production (retag only, no rebuild)
-# Runs after staging deploy. Pauses for manual approval via GitHub Environment.
+# Pauses for manual approval via GitHub Environment.
 # Set up required reviewers at: Settings > Environments > production
-# Uses ACR HTTP API to retag :staging → :latest server-side (no image transfer).
-# App Service (production) watches :latest and auto-deploys via ACR webhook.
+#
+# Required GitHub Secrets:
+#   PRODUCTION_WEB_PUBLISH_PROFILE, PRODUCTION_SERVER_PUBLISH_PROFILE
+#
+# Required GitHub Variables (environment: production):
+#   PRODUCTION_WEB_APP_NAME, PRODUCTION_SERVER_APP_NAME
 # ─────────────────────────────────────────────────────────────────────────────
   promote-production:
     name: Promote to Production (retag)
@@ -162,13 +189,27 @@ jobs:
 
           echo "$SERVER_IMAGE: staging → latest"
 
+      # ── Deploy to Production via Publish Profile ─────────────────────────────
+      - name: Deploy Web Image to Production App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.PRODUCTION_WEB_APP_NAME }}
+          publish-profile: ${{ secrets.PRODUCTION_WEB_PUBLISH_PROFILE }}
+          images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:latest
+
+      - name: Deploy Server Image to Production App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.PRODUCTION_SERVER_APP_NAME }}
+          publish-profile: ${{ secrets.PRODUCTION_SERVER_PUBLISH_PROFILE }}
+          images: ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE }}:latest
+
       - name: Summary
         run: |
-          echo "### Production Promotion Complete" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Production Promotion Complete" >> $GITHUB_STEP_SUMMARY
           echo "No rebuild — \`staging\` manifests retagged to \`latest\` via ACR HTTP API." >> $GITHUB_STEP_SUMMARY
-          echo "Azure App Service (production) will auto-deploy via ACR webhook." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | Promoted Tag |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| \`$REGISTRY/$WEB_IMAGE\` | \`staging\` → \`latest\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| \`$REGISTRY/$SERVER_IMAGE\` | \`staging\` → \`latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| App Service | Image |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ vars.PRODUCTION_WEB_APP_NAME }}\` | \`$REGISTRY/$WEB_IMAGE:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ vars.PRODUCTION_SERVER_APP_NAME }}\` | \`$REGISTRY/$SERVER_IMAGE:latest\` |" >> $GITHUB_STEP_SUMMARY
