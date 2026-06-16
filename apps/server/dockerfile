@@ -27,8 +27,16 @@ ENV NODE_ENV=production
 # main.ts already handles: const port = process.env.PORT || 4000
 EXPOSE 5000
 
-COPY --from=builder /app/apps/server/dist ./dist
+# Copy the server distribution files
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+
+# Copy local node_modules of server and root node_modules to preserve symlinks
+COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
 COPY --from=builder /app/node_modules ./node_modules
+
+# Copy shared packages
 COPY --from=builder /app/apps/shared ./apps/shared
 
+# Set working directory to the server app to let Node resolve the local dependencies
+WORKDIR /app/apps/server
 CMD ["node", "dist/main.js"]
