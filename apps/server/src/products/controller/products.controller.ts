@@ -109,9 +109,10 @@ export class ProductsController {
         images: imageUrls,
         brandLogo: brandLogoUrl,
       });
-    } catch {
+    } catch (error) {
+      console.error('Error creating product:', error);
       throw new InternalServerErrorException(
-        'Failed to process images or create product',
+        error instanceof Error ? error.message : 'Failed to process images or create product',
       );
     }
   }
