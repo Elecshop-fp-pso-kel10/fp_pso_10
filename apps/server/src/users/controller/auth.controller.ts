@@ -21,7 +21,6 @@ import { AuthService } from '../services/auth.service';
 import { UsersService } from '../services/users.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthResponseDto, LoginDto } from '../dtos/auth.dto';
-import { NotAuthenticatedGuard } from '@/guards/not-authenticated.guard';
 import { Response, Request } from 'express';
 import { cookieConfig } from '@apps/shared/cookie-config';
 

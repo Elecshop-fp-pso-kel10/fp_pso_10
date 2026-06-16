@@ -22,7 +22,7 @@ interface MongoError {
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(@InjectModel(User.name) private userModel: Model<User>) { }
 
   async create(user: Partial<User>): Promise<UserDocument> {
     try {
