@@ -103,7 +103,7 @@ export class ProductsController {
         this.appService.uploadImageToCloudinary(brandLogoFiles[0]),
       ]);
 
-      return this.productsService.create({
+      return await this.productsService.create({
         ...productData,
         images: imageUrls,
         brandLogo: brandLogoUrl,
