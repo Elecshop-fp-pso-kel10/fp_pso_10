@@ -12,7 +12,6 @@ import {
   UploadedFiles,
   Res,
   BadRequestException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 // removed: UploadedFile (unused), FileInterceptor (unused)
 import { AdminGuard } from 'src/guards/admin.guard';
@@ -111,7 +110,7 @@ export class ProductsController {
       });
     } catch (error) {
       console.error('Error creating product:', error);
-      throw new InternalServerErrorException(
+      throw new BadRequestException(
         error instanceof Error ? error.message : 'Failed to process images or create product',
       );
     }
