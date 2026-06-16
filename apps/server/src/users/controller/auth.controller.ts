@@ -43,7 +43,7 @@ export class AuthController {
     status: 401,
     description: 'Invalid credentials',
   })
-  @UseGuards(NotAuthenticatedGuard, LocalAuthGuard)
+  @UseGuards(LocalAuthGuard)
   @Post('login')
   async login(
     @Body() loginDto: LoginDto,
