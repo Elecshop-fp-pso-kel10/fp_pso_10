@@ -18,7 +18,7 @@ export function useAiProductCreation() {
     reload,
     stop,
   } = useChat({
-    api: `${process.env.NEXT_PUBLIC_API_URL}/products/agent/stream`,
+    api: '/v1/products/agent/stream',
     initialMessages: [
       {
         id: '1',

@@ -48,6 +48,15 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+
+  async rewrites() {
+    return [
+      {
+        source: '/v1/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/v1'}/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
