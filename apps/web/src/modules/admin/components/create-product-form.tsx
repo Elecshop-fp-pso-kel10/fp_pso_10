@@ -46,9 +46,8 @@ export function CreateProductForm() {
     brandLogo: undefined,
   });
 
-  const createProductBound = createProduct.bind(null, formData);
   const [productState, productAction, pending] = useActionState(
-    createProductBound,
+    createProduct,
     {},
   );
 
@@ -136,8 +135,6 @@ export function CreateProductForm() {
 
     const result = productSchema.safeParse(dataToValidate);
 
-    console.log(result);
-
     if (!result.success) {
       toast({
         variant: 'destructive',
@@ -148,15 +145,14 @@ export function CreateProductForm() {
     }
 
     const formDataToSend = new FormData();
+    formDataToSend.append('name', dataToValidate.name);
+    formDataToSend.append('description', dataToValidate.description);
+    formDataToSend.append('price', String(dataToValidate.price));
+    formDataToSend.append('brand', dataToValidate.brand);
+    formDataToSend.append('category', dataToValidate.category);
+    formDataToSend.append('countInStock', String(dataToValidate.countInStock));
 
-    Object.entries(dataToValidate).forEach(([key, value]) => {
-      if (key !== 'images') {
-        formDataToSend.append(key, String(value));
-      }
-    });
-
-    const files = formData.getAll('images');
-    if (files.length === 0) {
+    if (dataToValidate.images.length === 0) {
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -165,7 +161,7 @@ export function CreateProductForm() {
       return;
     }
 
-    files.forEach(file => {
+    dataToValidate.images.forEach(file => {
       formDataToSend.append('images', file);
     });
 

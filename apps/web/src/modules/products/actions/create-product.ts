@@ -1,6 +1,6 @@
 'use server';
 
-import { ProductFormData, productSchema } from '../validation/product';
+import { productSchema } from '../validation/product';
 import { revalidatePath } from 'next/cache';
 import { fetchWithAuth } from '@/lib/fetch-with-auth';
 
@@ -16,15 +16,20 @@ export interface ProductResponseState {
 }
 
 export async function createProduct(
-  data: ProductFormData,
   formState: ProductResponseState,
   formData: FormData,
 ): Promise<ProductResponseState> {
-  // `images` is intentionally excluded from server-side validation here
-  // because images come through formData directly; destructure to omit it
-  const { images: _images, ...restData } = data;  // was: images (flagged as unused)
-  const validationSchema = productSchema.omit({ images: true });
-  const result = validationSchema.safeParse(restData);
+  const data = {
+    name: formData.get('name') as string,
+    description: formData.get('description') as string,
+    price: Number(formData.get('price')),
+    brand: formData.get('brand') as string,
+    category: formData.get('category') as string,
+    countInStock: Number(formData.get('countInStock')),
+  };
+
+  const validationSchema = productSchema.omit({ images: true, brandLogo: true });
+  const result = validationSchema.safeParse(data);
 
   if (!result.success) {
     return {
@@ -40,6 +45,15 @@ export async function createProduct(
       error: {
         title: 'Validation Error',
         description: 'At least one image is required',
+      },
+    };
+  }
+
+  if (!formData.get('brandLogo')) {
+    return {
+      error: {
+        title: 'Validation Error',
+        description: 'Brand logo is required',
       },
     };
   }

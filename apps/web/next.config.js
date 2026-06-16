@@ -30,7 +30,7 @@ const nextConfig = {
 
   // Required for Docker / Azure App Service deployment
   // Generates a self-contained build in .next/standalone
-  output: 'standalone',
+  output: process.env.NEXT_STANDALONE === 'true' || process.platform !== 'win32' ? 'standalone' : undefined,
 
   experimental: {
     externalDir: true,
