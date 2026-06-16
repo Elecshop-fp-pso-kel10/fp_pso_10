@@ -70,8 +70,8 @@ export class ProductsController {
       ],
       {
         fileFilter: (req, file, cb) => {
-          if (!file.mimetype.match(/^image\/(jpg|jpeg|png|gif)$/)) {
-            cb(new Error('Only image files are allowed!'), false);
+          if (!file.mimetype.match(/^image\/(jpg|jpeg|png|gif|webp)$/i)) {
+            return cb(new Error('Only image files are allowed!'), false);
           }
           cb(null, true);
         },
