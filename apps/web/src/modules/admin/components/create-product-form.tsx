@@ -102,7 +102,7 @@ export function CreateProductForm() {
         };
       }
 
-      return createProduct(state, formDataToSend);
+      return createProduct(formDataToSend);
     },
     {},
   );

@@ -16,7 +16,6 @@ export interface ProductResponseState {
 }
 
 export async function createProduct(
-  formState: ProductResponseState,
   formData: FormData,
 ): Promise<ProductResponseState> {
   const data = {
