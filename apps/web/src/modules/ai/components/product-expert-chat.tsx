@@ -11,7 +11,7 @@ import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
 export default function ProductExpertChat() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
     useChat({
-      api: `${process.env.NEXT_PUBLIC_API_URL}/products/agent/chat`,
+      api: '/v1/products/agent/chat',
       initialMessages: [
         {
           id: '1',

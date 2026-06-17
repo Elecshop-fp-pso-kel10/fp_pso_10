@@ -8,8 +8,8 @@ import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
-import { useFormState as useActionState } from 'react-dom';
-import { createProduct } from '@/modules/products/actions/create-product';
+import { useFormState } from 'react-dom';
+import { createProduct, ProductResponseState } from '@/modules/products/actions/create-product';
 import { productSchema } from '@/modules/products/validation/product';
 import { ZodError } from 'zod';  // removed unused `z` type import
 import {
@@ -46,20 +46,75 @@ export function CreateProductForm() {
     brandLogo: undefined,
   });
 
-  const createProductBound = createProduct.bind(null, formData);
-  const [productState, productAction, pending] = useActionState(
-    createProductBound,
+  const [productState, productAction, pending] = useFormState(
+    async (state: ProductResponseState, formData: FormData) => {
+      const dataToValidate = {
+        name: formData.get('name') as string,
+        description: formData.get('description') as string,
+        price: Number(formData.get('price')),
+        brand: formData.get('brand') as string,
+        category: formData.get('category') as string,
+        countInStock: Number(formData.get('countInStock')),
+        images: Array.from(formData.getAll('images')) as File[],
+        brandLogo: formData.get('brandLogo') as File,
+      };
+
+      const result = productSchema.safeParse(dataToValidate);
+
+      if (!result.success) {
+        return {
+          error: {
+            title: 'Validation Error',
+            description: result.error.issues[0].message,
+          },
+        };
+      }
+
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', dataToValidate.name);
+      formDataToSend.append('description', dataToValidate.description);
+      formDataToSend.append('price', String(dataToValidate.price));
+      formDataToSend.append('brand', dataToValidate.brand);
+      formDataToSend.append('category', dataToValidate.category);
+      formDataToSend.append('countInStock', String(dataToValidate.countInStock));
+
+      if (dataToValidate.images.length === 0 || !dataToValidate.images[0].name) {
+        return {
+          error: {
+            title: 'Validation Error',
+            description: 'Please select at least one image',
+          },
+        };
+      }
+
+      dataToValidate.images.forEach(file => {
+        formDataToSend.append('images', file);
+      });
+
+      if (dataToValidate.brandLogo && dataToValidate.brandLogo.name) {
+        formDataToSend.append('brandLogo', dataToValidate.brandLogo);
+      } else {
+        return {
+          error: {
+            title: 'Validation Error',
+            description: 'Brand logo is required',
+          },
+        };
+      }
+
+      return createProduct(formDataToSend);
+    },
     {},
   );
 
   useEffect(() => {
-    if (productState.data) {
+    if (productState?.data) {
       toast({
         title: productState.data.title,
         description: productState.data.description,
       });
       router.push('/admin/products');
-    } else if (productState.error) {
+    } else if (productState?.error) {
       toast({
         variant: 'destructive',
         title: productState.error.title,
@@ -122,63 +177,9 @@ export function CreateProductForm() {
     }
   };
 
-  const handleSubmit = async (formData: FormData) => {
-    const dataToValidate = {
-      name: formData.get('name') as string,
-      description: formData.get('description') as string,
-      price: Number(formData.get('price')),
-      brand: formData.get('brand') as string,
-      category: formData.get('category') as string,
-      countInStock: Number(formData.get('countInStock')),
-      images: Array.from(formData.getAll('images')) as File[],
-      brandLogo: formData.get('brandLogo') as File,
-    };
-
-    const result = productSchema.safeParse(dataToValidate);
-
-    console.log(result);
-
-    if (!result.success) {
-      toast({
-        variant: 'destructive',
-        title: 'Validation Error in `' + result.error.issues[0].path[0] + '`',
-        description: result.error.issues[0].message,
-      });
-      return;
-    }
-
-    const formDataToSend = new FormData();
-
-    Object.entries(dataToValidate).forEach(([key, value]) => {
-      if (key !== 'images') {
-        formDataToSend.append(key, String(value));
-      }
-    });
-
-    const files = formData.getAll('images');
-    if (files.length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Please select at least one image',
-      });
-      return;
-    }
-
-    files.forEach(file => {
-      formDataToSend.append('images', file);
-    });
-
-    if (dataToValidate.brandLogo) {
-      formDataToSend.append('brandLogo', dataToValidate.brandLogo);
-    }
-
-    return productAction(formDataToSend);
-  };
-
   return (
     <div className="grid gap-6 w-full max-w-2xl mx-auto">
-      <form action={handleSubmit} className="space-y-4">
+      <form action={productAction} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Product Name</Label>
           <Input

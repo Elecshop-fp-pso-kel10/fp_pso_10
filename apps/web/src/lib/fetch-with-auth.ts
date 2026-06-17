@@ -23,10 +23,7 @@ export async function fetchWithAuth(
     },
   });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Request failed');
-  }
-
+  // Return the response as-is and let callers decide how to handle non-OK responses.
+  // Throwing here would prevent callers (e.g. getProducts) from returning a fallback value.
   return response;
 }

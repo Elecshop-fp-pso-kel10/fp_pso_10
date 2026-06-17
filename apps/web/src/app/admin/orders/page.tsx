@@ -4,8 +4,19 @@ import { OrdersList } from '@/modules/admin/components/orders-list';
 import { Order } from '@apps/shared/types/order';
 
 export default async function AdminOrdersPage() {
-  const orders = await fetchWithAuth('/orders');
-  const ordersData: Order[] = await orders.json();
+  let ordersData: Order[] = [];
+
+  try {
+    const response = await fetchWithAuth('/orders');
+    if (response.ok) {
+      const data = await response.json();
+      ordersData = Array.isArray(data) ? data : [];
+    } else {
+      console.error('Failed to fetch orders, status:', response.status);
+    }
+  } catch (error) {
+    console.error('Error fetching admin orders:', error);
+  }
 
   return (
     <Container>
