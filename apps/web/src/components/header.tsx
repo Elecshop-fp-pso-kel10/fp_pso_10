@@ -39,7 +39,7 @@ export function Header() {
             <SearchBox />
           </div>
 
-          <nav className="flex items-center gap-4 md:gap-2 sm:hidden">
+          <nav className="flex items-center gap-4 md:gap-2">
             <ThemeToggle />
             <CartIcon />
             <UserMenu />
