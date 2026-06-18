@@ -1,6 +1,6 @@
 /**
- * Smoke Test Suite — Elecshop API
- *
+ * Smoke Test Suite — Elecshop API 
+ * tes
  * Covers the critical paths of every major module:
  *   Auth     → register, login, profile, refresh, logout
  *   Products → list, top-rated, single product
