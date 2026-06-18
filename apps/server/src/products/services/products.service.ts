@@ -73,6 +73,45 @@ export class ProductsService {
     };
   }
 
+  async findByFilters(filters: {
+    brand?: string;
+    category?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    keywords?: string;
+    limit?: number;
+  }): Promise<ProductDocument[]> {
+    const { brand, category, minPrice, maxPrice, keywords, limit = 10 } = filters;
+
+    const query: Record<string, unknown> = {};
+
+    if (brand) {
+      query.brand = { $regex: brand, $options: 'i' };
+    }
+
+    if (category) {
+      query.category = { $regex: category, $options: 'i' };
+    }
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      query.price = {};
+      if (minPrice !== undefined) (query.price as Record<string, number>).$gte = minPrice;
+      if (maxPrice !== undefined) (query.price as Record<string, number>).$lte = maxPrice;
+    }
+
+    if (keywords) {
+      const terms = keywords.split(' ').filter(Boolean);
+      query.$and = terms.map(term => ({
+        $or: [
+          { name: { $regex: term, $options: 'i' } },
+          { description: { $regex: term, $options: 'i' } },
+        ],
+      }));
+    }
+
+    return this.productModel.find(query).limit(limit).exec();
+  }
+
   async findById(id: string): Promise<ProductDocument> {
     if (!Types.ObjectId.isValid(id))
       throw new BadRequestException('Invalid product ID.');
