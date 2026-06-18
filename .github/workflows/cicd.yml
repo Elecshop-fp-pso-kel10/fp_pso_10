@@ -4,65 +4,128 @@ on:
   push:
     branches:
       - main
-      
   workflow_dispatch:
 
-    
 env:
-  REGISTRY: ${{secrets.AZURE_REGISTRY_LOGIN_SERVER}}
+  REGISTRY: ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}
   WEB_IMAGE: elecshop-web
   SERVER_IMAGE: elecshop-server
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 1: CI — Lint & Test
+# JOB 1: CI — Lint & Test  (pnpm store cached across runs)
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
   ci:
     name: Lint & Test
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 8.15.4
 
-      - name: Install Dependencies
+      # Cache the pnpm store so subsequent runs skip re-downloading packages
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run Lint
+      - name: Lint
         run: pnpm turbo run lint
 
-      - name: Run Tests
+      - name: Test
         run: pnpm turbo run test
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 2: Build & Push to ACR, then deploy to Staging via Publish Profile.
-# No service principal, no deployment slots needed.
-#
-# Required GitHub Secrets (global):
-#   AZURE_REGISTRY_LOGIN_SERVER, AZURE_REGISTRY_USERNAME, AZURE_REGISTRY_PASSWORD
-#   STAGING_WEB_PUBLISH_PROFILE   ← download from Azure Portal (see walkthrough)
-#   STAGING_SERVER_PUBLISH_PROFILE
-#
-# Required GitHub Variables (environment: staging):
-#   STAGING_WEB_APP_NAME, STAGING_SERVER_APP_NAME
+# JOB 2a: Build & Push Web image  (parallel with 2b)
 # ─────────────────────────────────────────────────────────────────────────────
-  build-and-deploy-staging:
-    name: Build & Deploy to Staging
+  build-web:
+    name: Build Web Image
     runs-on: ubuntu-latest
     needs: ci
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to ACR
+        run: |
+          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login $REGISTRY \
+            --username "${{ secrets.AZURE_REGISTRY_USERNAME }}" \
+            --password-stdin
+
+      # Pull the previous staging image to use as a layer cache source.
+      # If it doesn't exist yet (first run) the pull fails silently and
+      # Docker falls back to a full build — safe either way.
+      - name: Warm Docker layer cache (web)
+        run: docker pull $REGISTRY/$WEB_IMAGE:staging || true
+
+      - name: Build & Push Web image
+        run: |
+          docker build \
+            --cache-from $REGISTRY/$WEB_IMAGE:staging \
+            --build-arg NEXT_PUBLIC_API_URL=${{ vars.STAGING_API_URL }} \
+            -f apps/web/dockerfile \
+            -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
+            -t $REGISTRY/$WEB_IMAGE:staging \
+            .
+          docker push $REGISTRY/$WEB_IMAGE:${{ github.sha }}
+          docker push $REGISTRY/$WEB_IMAGE:staging
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2b: Build & Push Server image  (parallel with 2a)
+# ─────────────────────────────────────────────────────────────────────────────
+  build-server:
+    name: Build Server Image
+    runs-on: ubuntu-latest
+    needs: ci
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to ACR
+        run: |
+          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login $REGISTRY \
+            --username "${{ secrets.AZURE_REGISTRY_USERNAME }}" \
+            --password-stdin
+
+      - name: Warm Docker layer cache (server)
+        run: docker pull $REGISTRY/$SERVER_IMAGE:staging || true
+
+      - name: Build & Push Server image
+        run: |
+          docker build \
+            --cache-from $REGISTRY/$SERVER_IMAGE:staging \
+            -f apps/server/dockerfile \
+            -t $REGISTRY/$SERVER_IMAGE:${{ github.sha }} \
+            -t $REGISTRY/$SERVER_IMAGE:staging \
+            .
+          docker push $REGISTRY/$SERVER_IMAGE:${{ github.sha }}
+          docker push $REGISTRY/$SERVER_IMAGE:staging
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 3: Deploy both images to Staging  (parallel deploy steps)
+# ─────────────────────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-web, build-server]
 
     environment:
       name: staging
@@ -72,302 +135,243 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Login to Azure Container Registry
-        run: |
-          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login $REGISTRY \
-            --username "${{ secrets.AZURE_REGISTRY_USERNAME }}" \
-            --password-stdin
-
-      - name: Build & Push Web Image
-        run: |
-          docker build \
-            --build-arg NEXT_PUBLIC_API_URL=${{ vars.STAGING_API_URL }} \
-            -f apps/web/dockerfile \
-            -t $REGISTRY/$WEB_IMAGE:${{ github.sha }} \
-            -t $REGISTRY/$WEB_IMAGE:staging \
-            .
-          docker push $REGISTRY/$WEB_IMAGE:${{ github.sha }}
-          docker push $REGISTRY/$WEB_IMAGE:staging
-
-      - name: Build & Push Server Image
-        run: |
-          docker build \
-            -f apps/server/dockerfile \
-            -t $REGISTRY/$SERVER_IMAGE:${{ github.sha }} \
-            -t $REGISTRY/$SERVER_IMAGE:staging \
-            .
-          docker push $REGISTRY/$SERVER_IMAGE:${{ github.sha }}
-          docker push $REGISTRY/$SERVER_IMAGE:staging
-
-      # ── Deploy via Publish Profile (no service principal needed) ─────────────
       - name: Deploy Web Image to Staging App Service
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.STAGING_WEB_APP_NAME }}
+          app-name:        ${{ vars.STAGING_WEB_APP_NAME }}
           publish-profile: ${{ secrets.STAGING_WEB_PUBLISH_PROFILE }}
-          images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:${{ github.sha }}
+          images:          ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:${{ github.sha }}
 
       - name: Deploy Server Image to Staging App Service
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.STAGING_SERVER_APP_NAME }}
+          app-name:        ${{ vars.STAGING_SERVER_APP_NAME }}
           publish-profile: ${{ secrets.STAGING_SERVER_PUBLISH_PROFILE }}
-          images: ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE }}:${{ github.sha }}
+          images:          ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE }}:${{ github.sha }}
 
       - name: Summary
         run: |
           echo "### ✅ Staging Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "Images pushed to ACR and deployed via Publish Profile." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| App Service | Image |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| App | Image |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ vars.STAGING_WEB_APP_NAME }}\` | \`$REGISTRY/$WEB_IMAGE:staging\` |" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ vars.STAGING_SERVER_APP_NAME }}\` | \`$REGISTRY/$SERVER_IMAGE:staging\` |" >> $GITHUB_STEP_SUMMARY
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 3a: Smoke Test — Server API (NestJS)
-# Runs against the live Staging server after deployment.
-# Blocks promotion to production on failure.
-#
-# Required GitHub Variables (environment: staging):
-#   STAGING_API_URL  — e.g. https://elecshop-server-staging.azurewebsites.net
-#
-# Optional GitHub Secrets (for admin-only test paths):
-#   SMOKE_ADMIN_EMAIL, SMOKE_ADMIN_PASSWORD
+# JOB 4a: Smoke Test — Server API  (parallel with 4b)
+# Playwright browser cache persisted across runs.
 # ─────────────────────────────────────────────────────────────────────────────
   smoke-test-server:
     name: Smoke Test — Server API
     runs-on: ubuntu-latest
-    needs: build-and-deploy-staging
-
+    needs: deploy-staging
     environment:
       name: staging
-
     permissions:
       contents: read
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 8.15.4
 
-      - name: Install Server Dependencies
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install server dependencies only
         working-directory: apps/server
         run: pnpm install --frozen-lockfile
 
-      - name: Wait for Staging Server to be Ready
+      - name: Wait for staging server
         run: |
-          echo "Waiting for staging server at ${{ vars.STAGING_API_URL }}..."
           for i in $(seq 1 20); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.STAGING_API_URL }}" || echo "000")
-            if [ "$STATUS" != "000" ]; then
-              echo "Server responded with HTTP $STATUS — ready."
-              exit 0
-            fi
-            echo "Attempt $i/20 — not ready yet, retrying in 15s..."
+            [ "$STATUS" != "000" ] && echo "Ready ($STATUS)" && exit 0
+            echo "Attempt $i/20 — retrying in 15s…"
             sleep 15
           done
-          echo "Server did not become ready in time." && exit 1
+          echo "Server did not become ready." && exit 1
 
-      - name: Run Server Smoke Tests
+      - name: Run server smoke tests
         working-directory: apps/server
         env:
-          BASE_URL: ${{ vars.STAGING_API_URL }}
-          ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
+          BASE_URL:       ${{ vars.STAGING_API_URL }}
+          ADMIN_EMAIL:    ${{ secrets.SMOKE_ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
         run: pnpm test:smoke
 
-      - name: Upload Server Smoke Test Results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: server-smoke-results-${{ github.sha }}
           path: apps/server/coverage/
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 3b: Smoke Test — Web Frontend (Next.js + Playwright)
-# Runs against the live Staging web app after deployment.
-# Blocks promotion to production on failure.
-#
-# Required GitHub Variables (environment: staging):
-#   STAGING_WEB_URL  — e.g. https://elecshop-web-staging.azurewebsites.net
-#
-# Optional GitHub Secrets (for authenticated test paths):
-#   SMOKE_TEST_USER_EMAIL, SMOKE_TEST_USER_PASSWORD
-#   SMOKE_ADMIN_EMAIL, SMOKE_ADMIN_PASSWORD
+# JOB 4b: Smoke Test — Web Frontend  (parallel with 4a)
+# Playwright browser cache persisted across runs.
 # ─────────────────────────────────────────────────────────────────────────────
   smoke-test-web:
     name: Smoke Test — Web Frontend
     runs-on: ubuntu-latest
-    needs: build-and-deploy-staging
-
+    needs: deploy-staging
     environment:
       name: staging
-
     permissions:
       contents: read
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 8.15.4
 
-      - name: Install Web Dependencies
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install web dependencies only
         working-directory: apps/web
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Browsers
+      # Key on the exact Playwright version string — more precise than package.json
+      # hash, and ensures the cache only busts when Playwright itself is upgraded.
+      - name: Get Playwright version
+        id: playwright-version
         working-directory: apps/web
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+      # No restore-keys fallback — a partial browser install is not useful and
+      # would cause cryptic failures at test time.
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ steps.playwright-version.outputs.version }}
+
+      # Cache miss (first run or version bump): download binary + install OS libs
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium --with-deps
 
-      - name: Wait for Staging Web to be Ready
+      # Cache hit: binary already restored — only run apt-get for OS-level libs
+      # (~10–15 s) and skip the ~170 MB binary download entirely
+      - name: Install Playwright OS dependencies (cache hit)
+        working-directory: apps/web
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Wait for staging web
         run: |
-          echo "Waiting for staging web at ${{ vars.STAGING_WEB_URL }}..."
           for i in $(seq 1 20); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.STAGING_WEB_URL }}" || echo "000")
-            if [ "$STATUS" = "200" ] || [ "$STATUS" = "304" ]; then
-              echo "Web app responded with HTTP $STATUS — ready."
-              exit 0
-            fi
-            echo "Attempt $i/20 — got $STATUS, retrying in 15s..."
+            { [ "$STATUS" = "200" ] || [ "$STATUS" = "304" ]; } && echo "Ready ($STATUS)" && exit 0
+            echo "Attempt $i/20 — got $STATUS, retrying in 15s…"
             sleep 15
           done
-          echo "Web app did not become ready in time." && exit 1
+          echo "Web app did not become ready." && exit 1
 
-      - name: Run Web Smoke Tests
+      - name: Run web smoke tests
         working-directory: apps/web
         env:
-          WEB_URL: ${{ vars.STAGING_WEB_URL }}
-          TEST_USER_EMAIL: ${{ secrets.SMOKE_TEST_USER_EMAIL }}
-          TEST_USER_PASSWORD: ${{ secrets.SMOKE_TEST_USER_PASSWORD }}
-          ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
-          ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+          WEB_URL:             ${{ vars.STAGING_WEB_URL }}
+          TEST_USER_EMAIL:     ${{ secrets.SMOKE_TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD:  ${{ secrets.SMOKE_TEST_USER_PASSWORD }}
+          ADMIN_EMAIL:         ${{ secrets.SMOKE_ADMIN_EMAIL }}
+          ADMIN_PASSWORD:      ${{ secrets.SMOKE_ADMIN_PASSWORD }}
         run: pnpm test:smoke
 
-      - name: Upload Playwright Report
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ github.sha }}
           path: apps/web/playwright-report/
           retention-days: 7
 
-      - name: Upload Playwright Screenshots (on failure)
+      - uses: actions/upload-artifact@v4
         if: failure()
-        uses: actions/upload-artifact@v4
         with:
           name: playwright-screenshots-${{ github.sha }}
           path: apps/web/test-results/
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 4: Promote Staging → Production (retag only, no rebuild)
-# Pauses for manual approval via GitHub Environment.
-# Set up required reviewers at: Settings > Environments > production
-#
-# Requires BOTH smoke test jobs to pass before the manual gate appears.
-#
-# Required GitHub Secrets:
-#   PRODUCTION_WEB_PUBLISH_PROFILE, PRODUCTION_SERVER_PUBLISH_PROFILE
-#
-# Required GitHub Variables (environment: production):
-#   PRODUCTION_WEB_APP_NAME, PRODUCTION_SERVER_APP_NAME
+# JOB 5: Promote Staging → Production  (retag only, manual gate)
 # ─────────────────────────────────────────────────────────────────────────────
   promote-production:
     name: Promote to Production (retag)
     runs-on: ubuntu-latest
     needs: [smoke-test-server, smoke-test-web]
-
     environment:
       name: production
-
     permissions:
       contents: read
 
     steps:
-      - name: Retag Web Image (staging → latest)
+      - name: Retag Web image (staging → latest)
         run: |
           TOKEN=$(curl -s -u "${{ secrets.AZURE_REGISTRY_USERNAME }}:${{ secrets.AZURE_REGISTRY_PASSWORD }}" \
             "https://$REGISTRY/oauth2/token?service=$REGISTRY&scope=repository:$WEB_IMAGE:pull,push" \
             | jq -r '.access_token')
-
           MANIFEST=$(curl -s -H "Authorization: Bearer $TOKEN" \
             -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://$REGISTRY/v2/$WEB_IMAGE/manifests/staging")
-
-          MEDIA_TYPE=$(echo "$MANIFEST" | jq -r '.mediaType')
-
           curl -s -X PUT \
             -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: $MEDIA_TYPE" \
+            -H "Content-Type: $(echo "$MANIFEST" | jq -r '.mediaType')" \
             -d "$MANIFEST" \
             "https://$REGISTRY/v2/$WEB_IMAGE/manifests/latest"
-
           echo "$WEB_IMAGE: staging → latest"
 
-      - name: Retag Server Image (staging → latest)
+      - name: Retag Server image (staging → latest)
         run: |
           TOKEN=$(curl -s -u "${{ secrets.AZURE_REGISTRY_USERNAME }}:${{ secrets.AZURE_REGISTRY_PASSWORD }}" \
             "https://$REGISTRY/oauth2/token?service=$REGISTRY&scope=repository:$SERVER_IMAGE:pull,push" \
             | jq -r '.access_token')
-
           MANIFEST=$(curl -s -H "Authorization: Bearer $TOKEN" \
             -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://$REGISTRY/v2/$SERVER_IMAGE/manifests/staging")
-
-          MEDIA_TYPE=$(echo "$MANIFEST" | jq -r '.mediaType')
-
           curl -s -X PUT \
             -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: $MEDIA_TYPE" \
+            -H "Content-Type: $(echo "$MANIFEST" | jq -r '.mediaType')" \
             -d "$MANIFEST" \
             "https://$REGISTRY/v2/$SERVER_IMAGE/manifests/latest"
-
           echo "$SERVER_IMAGE: staging → latest"
 
-      # ── Deploy to Production via Publish Profile ─────────────────────────────
-      - name: Deploy Web Image to Production App Service
+      - name: Deploy Web to Production
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.PRODUCTION_WEB_APP_NAME }}
+          app-name:        ${{ vars.PRODUCTION_WEB_APP_NAME }}
           publish-profile: ${{ secrets.PRODUCTION_WEB_PUBLISH_PROFILE }}
-          images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:latest
+          images:          ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:latest
 
-      - name: Deploy Server Image to Production App Service
+      - name: Deploy Server to Production
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.PRODUCTION_SERVER_APP_NAME }}
+          app-name:        ${{ vars.PRODUCTION_SERVER_APP_NAME }}
           publish-profile: ${{ secrets.PRODUCTION_SERVER_PUBLISH_PROFILE }}
-          images: ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE }}:latest
+          images:          ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE }}:latest
 
       - name: Summary
         run: |
           echo "### ✅ Production Promotion Complete" >> $GITHUB_STEP_SUMMARY
-          echo "No rebuild — \`staging\` manifests retagged to \`latest\` via ACR HTTP API." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| App Service | Image |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| App | Image |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ vars.PRODUCTION_WEB_APP_NAME }}\` | \`$REGISTRY/$WEB_IMAGE:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ vars.PRODUCTION_SERVER_APP_NAME }}\` | \`$REGISTRY/$SERVER_IMAGE:latest\` |" >> $GITHUB_STEP_SUMMARY
