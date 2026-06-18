@@ -8,9 +8,7 @@ import { AuthProvider } from '@/components/auth-provider';
 import { CartProvider } from '@/modules/cart/context/cart-context';
 import { CheckoutProvider } from '@/modules/checkout/context/checkout-context';
 import { ThemeProvider } from '@/components/theme-provider';
-import { HolidayThemeProvider } from '@/components/holiday-theme-provider';
-import { HolidayBanner } from '@/components/holiday-banner';
-import { HolidayParticles } from '@/components/holiday-particles';
+import { HolidayShell } from '@/components/holiday-shell';
 
 export const metadata: Metadata = {
   title: 'Elecshop',
@@ -37,17 +35,11 @@ export default function RootLayout({
             <AuthProvider>
               <CartProvider>
                 <CheckoutProvider>
-                  {/* HolidayThemeProvider must wrap the rest so that
-                      HolidayBanner and HolidayParticles can read the context */}
-                  <HolidayThemeProvider>
-                    {/* Banner sits above the sticky header */}
-                    <HolidayBanner />
+                  <HolidayShell> {/* ← satu wrapper */}
                     <Header />
                     <main className="flex-1">{children}</main>
                     <Toaster />
-                    {/* Particles render on top of everything */}
-                    <HolidayParticles />
-                  </HolidayThemeProvider>
+                  </HolidayShell>
                 </CheckoutProvider>
               </CartProvider>
             </AuthProvider>
