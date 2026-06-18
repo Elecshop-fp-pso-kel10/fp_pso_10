@@ -1,10 +1,10 @@
 name: CI/CD Pipeline
-
+# comment2
 on:
   push:
     branches:
       - main
-      - jobi
+      
   workflow_dispatch:
 
     

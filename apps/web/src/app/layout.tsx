@@ -8,6 +8,8 @@ import { AuthProvider } from '@/components/auth-provider';
 import { CartProvider } from '@/modules/cart/context/cart-context';
 import { CheckoutProvider } from '@/modules/checkout/context/checkout-context';
 import { ThemeProvider } from '@/components/theme-provider';
+import { HolidayShell } from '@/components/holiday-shell';
+
 
 export const metadata: Metadata = {
   title: 'Elecshop',
@@ -34,9 +36,11 @@ export default function RootLayout({
             <AuthProvider>
               <CartProvider>
                 <CheckoutProvider>
-                  <Header />
-                  <main className="flex-1">{children}</main>
-                  <Toaster />
+                  <HolidayShell> {/* ← satu wrapper */}
+                    <Header />
+                    <main className="flex-1">{children}</main>
+                    <Toaster />
+                  </HolidayShell>
                 </CheckoutProvider>
               </CartProvider>
             </AuthProvider>
