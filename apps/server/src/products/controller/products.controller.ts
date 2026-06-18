@@ -26,6 +26,7 @@ import { AppService } from '@/app/services/app.service';
 import { ProductExpertAgent } from '@/ai/agents/product-expert.agent';
 import { ChatRequest } from '@apps/shared/types/agents';
 import { Response } from 'express';
+import { ProductFinderAgent } from '@/ai/agents/product-finder.agent';
 
 @Controller('products')
 export class ProductsController {
@@ -33,6 +34,7 @@ export class ProductsController {
     private productsService: ProductsService,
     private appService: AppService,
     private productExpertAgent: ProductExpertAgent,
+    private productFinderAgent: ProductFinderAgent,
   ) {}
 
   @Get()
@@ -136,6 +138,13 @@ export class ProductsController {
   async chat(@Body() body: ChatRequest, @Res() res: Response) {
     const { messages } = body;
     const result = await this.productExpertAgent.chat(messages);
+    return result.pipeDataStreamToResponse(res);
+  }
+
+  @Post('finder/chat')
+  async finderChat(@Body() body: ChatRequest, @Res() res: Response) {
+    const { messages } = body;
+    const result = await this.productFinderAgent.chat(messages);
     return result.pipeDataStreamToResponse(res);
   }
 }
