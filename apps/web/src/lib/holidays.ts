@@ -49,7 +49,7 @@ export const HOLIDAYS: HolidayConfig[] = [
     name: 'Christmas',
     emoji: '🎄',
     bannerMessage: '🎄 Ho Ho Ho! Unwrap amazing Christmas deals — free shipping on orders over $50! 🎁',
-    ranges: [{ startMonth: 6, startDay: 1, endMonth: 12, endDay: 26 }],
+    ranges: [{ startMonth: 6, startDay: 18, endMonth: 12, endDay: 26 }],
     cssVars: {
       '--primary': '142 60% 30%',
       '--primary-foreground': '0 0% 98%',
