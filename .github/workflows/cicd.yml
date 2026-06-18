@@ -1,10 +1,9 @@
 name: CI/CD Pipeline
-# comment2
+
 on:
   push:
     branches:
       - main
-      - gabs
   workflow_dispatch:
 
     
@@ -128,9 +127,166 @@ jobs:
           echo "| \`${{ vars.STAGING_SERVER_APP_NAME }}\` | \`$REGISTRY/$SERVER_IMAGE:staging\` |" >> $GITHUB_STEP_SUMMARY
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 3: Promote Staging → Production (retag only, no rebuild)
+# JOB 3a: Smoke Test — Server API (NestJS)
+# Runs against the live Staging server after deployment.
+# Blocks promotion to production on failure.
+#
+# Required GitHub Variables (environment: staging):
+#   STAGING_API_URL  — e.g. https://elecshop-server-staging.azurewebsites.net
+#
+# Optional GitHub Secrets (for admin-only test paths):
+#   SMOKE_ADMIN_EMAIL, SMOKE_ADMIN_PASSWORD
+# ─────────────────────────────────────────────────────────────────────────────
+  smoke-test-server:
+    name: Smoke Test — Server API
+    runs-on: ubuntu-latest
+    needs: build-and-deploy-staging
+
+    environment:
+      name: staging
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.4
+
+      - name: Install Server Dependencies
+        working-directory: apps/server
+        run: pnpm install --frozen-lockfile
+
+      - name: Wait for Staging Server to be Ready
+        run: |
+          echo "Waiting for staging server at ${{ vars.STAGING_API_URL }}..."
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.STAGING_API_URL }}" || echo "000")
+            if [ "$STATUS" != "000" ]; then
+              echo "Server responded with HTTP $STATUS — ready."
+              exit 0
+            fi
+            echo "Attempt $i/20 — not ready yet, retrying in 15s..."
+            sleep 15
+          done
+          echo "Server did not become ready in time." && exit 1
+
+      - name: Run Server Smoke Tests
+        working-directory: apps/server
+        env:
+          BASE_URL: ${{ vars.STAGING_API_URL }}
+          ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+        run: pnpm test:smoke
+
+      - name: Upload Server Smoke Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-smoke-results-${{ github.sha }}
+          path: apps/server/coverage/
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 3b: Smoke Test — Web Frontend (Next.js + Playwright)
+# Runs against the live Staging web app after deployment.
+# Blocks promotion to production on failure.
+#
+# Required GitHub Variables (environment: staging):
+#   STAGING_WEB_URL  — e.g. https://elecshop-web-staging.azurewebsites.net
+#
+# Optional GitHub Secrets (for authenticated test paths):
+#   SMOKE_TEST_USER_EMAIL, SMOKE_TEST_USER_PASSWORD
+#   SMOKE_ADMIN_EMAIL, SMOKE_ADMIN_PASSWORD
+# ─────────────────────────────────────────────────────────────────────────────
+  smoke-test-web:
+    name: Smoke Test — Web Frontend
+    runs-on: ubuntu-latest
+    needs: build-and-deploy-staging
+
+    environment:
+      name: staging
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.4
+
+      - name: Install Web Dependencies
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        working-directory: apps/web
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Wait for Staging Web to be Ready
+        run: |
+          echo "Waiting for staging web at ${{ vars.STAGING_WEB_URL }}..."
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.STAGING_WEB_URL }}" || echo "000")
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "304" ]; then
+              echo "Web app responded with HTTP $STATUS — ready."
+              exit 0
+            fi
+            echo "Attempt $i/20 — got $STATUS, retrying in 15s..."
+            sleep 15
+          done
+          echo "Web app did not become ready in time." && exit 1
+
+      - name: Run Web Smoke Tests
+        working-directory: apps/web
+        env:
+          WEB_URL: ${{ vars.STAGING_WEB_URL }}
+          TEST_USER_EMAIL: ${{ secrets.SMOKE_TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.SMOKE_TEST_USER_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+        run: pnpm test:smoke
+
+      - name: Upload Playwright Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: apps/web/playwright-report/
+          retention-days: 7
+
+      - name: Upload Playwright Screenshots (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-screenshots-${{ github.sha }}
+          path: apps/web/test-results/
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 4: Promote Staging → Production (retag only, no rebuild)
 # Pauses for manual approval via GitHub Environment.
 # Set up required reviewers at: Settings > Environments > production
+#
+# Requires BOTH smoke test jobs to pass before the manual gate appears.
 #
 # Required GitHub Secrets:
 #   PRODUCTION_WEB_PUBLISH_PROFILE, PRODUCTION_SERVER_PUBLISH_PROFILE
@@ -141,7 +297,7 @@ jobs:
   promote-production:
     name: Promote to Production (retag)
     runs-on: ubuntu-latest
-    needs: build-and-deploy-staging
+    needs: [smoke-test-server, smoke-test-web]
 
     environment:
       name: production

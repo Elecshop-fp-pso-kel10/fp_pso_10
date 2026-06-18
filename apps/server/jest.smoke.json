@@ -1,0 +1,15 @@
+{
+  "rootDir": ".",
+  "testMatch": ["<rootDir>/test/smoke/**/*.test.ts"],
+  "transform": {
+    "^.+\\.ts$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+  },
+  "testEnvironment": "node",
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^src/(.*)$": "<rootDir>/src/$1",
+    "^@apps/shared/(.*)$": "<rootDir>/../../packages/shared/src/$1"
+  },
+  "testTimeout": 20000,
+  "verbose": true
+}
