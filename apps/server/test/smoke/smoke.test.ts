@@ -216,7 +216,7 @@ describe('Elecshop API — Smoke Tests', () => {
       const res = await client.get('/products?page=1&limit=1');
       expectStatus(res, 200);
       const body = res.data;
-      const items: any[] =
+      const items: uknown[] =
         Array.isArray(body) ? body :
         Array.isArray(body?.products) ? body.products :
         Array.isArray(body?.data) ? body.data : [];
