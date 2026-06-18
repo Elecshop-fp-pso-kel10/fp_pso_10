@@ -17,6 +17,8 @@
 
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
+type ProductItem = { _id?: string; id?: string };
+
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:4000';
@@ -216,7 +218,7 @@ describe('Elecshop API — Smoke Tests', () => {
       const res = await client.get('/products?page=1&limit=1');
       expectStatus(res, 200);
       const body = res.data;
-      const items: { _id?: string; id?: string }[] = ...
+      const items: ProductItem[] =
         Array.isArray(body) ? body :
         Array.isArray(body?.products) ? body.products :
         Array.isArray(body?.data) ? body.data : [];
