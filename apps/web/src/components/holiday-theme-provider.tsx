@@ -23,11 +23,7 @@ export function HolidayThemeProvider({ children }: { children: ReactNode }) {
   const [holiday, setHoliday] = useState<HolidayConfig | null>(null);
 
   useEffect(() => {
-    // TESTING — hardcode tanggal, ganti sesuai holiday yang mau ditest:
-    const detected = detectHoliday(new Date('2026-6-18')); // 🎃 Halloween
-    // const detected = detectHoliday(new Date('2024-12-10')); // 🎄 Christmas
-    // const detected = detectHoliday(new Date('2024-12-28')); // 🎆 New Year
-    // const detected = detectHoliday(new Date('2024-06-10')); // 🕌 Eid al-Adha
+    const detected = detectHoliday(new Date()); 
 
     setHoliday(detected);
 

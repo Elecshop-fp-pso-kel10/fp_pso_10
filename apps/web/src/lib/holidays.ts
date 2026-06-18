@@ -27,7 +27,7 @@ export const HOLIDAYS: HolidayConfig[] = [
     name: 'Halloween',
     emoji: '🎃',
     bannerMessage: '👻 Trick or treat! Spooky deals await this Halloween! 🦇',
-    ranges: [{ startMonth: 6, startDay: 18, endMonth: 10, endDay: 31 }],
+    ranges: [{ startMonth: 10, startDay: 1, endMonth: 10, endDay: 31 }],
     cssVars: {
       '--primary': '28 80% 50%',
       '--primary-foreground': '0 0% 98%',
