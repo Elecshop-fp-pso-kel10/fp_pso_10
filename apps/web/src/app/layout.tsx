@@ -10,6 +10,7 @@ import { CheckoutProvider } from '@/modules/checkout/context/checkout-context';
 import { ThemeProvider } from '@/components/theme-provider';
 import { HolidayShell } from '@/components/holiday-shell';
 
+
 export const metadata: Metadata = {
   title: 'Elecshop',
   description: 'Modern eCommerce platform',
