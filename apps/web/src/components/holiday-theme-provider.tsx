@@ -23,7 +23,7 @@ export function HolidayThemeProvider({ children }: { children: ReactNode }) {
   const [holiday, setHoliday] = useState<HolidayConfig | null>(null);
 
   useEffect(() => {
-    const detected = detectHoliday(new Date());
+    const detected = detectHoliday(new Date('2026-06-18'));
     setHoliday(detected);
 
     if (detected) {
