@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Post,
   Put,
   UseGuards,
@@ -78,6 +79,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @HttpCode(200)
   async refresh(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,

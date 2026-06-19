@@ -15,7 +15,7 @@ interface Particle {
 }
 
 export function HolidayParticles() {
-  const { holiday } = useHolidayTheme();
+  const { holiday, mounted } = useHolidayTheme();
   const [particles, setParticles] = useState<Particle[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +48,8 @@ export function HolidayParticles() {
     setParticles(generated);
   }, [holiday]);
 
-  if (!holiday || particles.length === 0) return null;
+  // Don't render anything until after hydration to avoid React 19 mismatch
+  if (!mounted || !holiday || particles.length === 0) return null;
 
   return (
     <div

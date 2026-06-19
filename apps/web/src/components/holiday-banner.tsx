@@ -5,10 +5,11 @@ import { X } from 'lucide-react';
 import { useHolidayTheme } from './holiday-theme-provider';
 
 export function HolidayBanner() {
-  const { holiday } = useHolidayTheme();
+  const { holiday, mounted } = useHolidayTheme();
   const [dismissed, setDismissed] = useState(false);
 
-  if (!holiday || dismissed) return null;
+  // Don't render anything until after hydration to avoid React 19 mismatch
+  if (!mounted || !holiday || dismissed) return null;
 
   const currentYear = new Date().getFullYear();
   const message = holiday.bannerMessage.replace('{year}', String(currentYear));
