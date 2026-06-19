@@ -57,6 +57,26 @@ async function assertNoError(page: Page) {
   expect(bodyText.trim().length).toBeGreaterThan(0);
 }
 
+/**
+ * Returns the submit button that belongs to the LOGIN FORM specifically.
+ *
+ * The global <Header> (rendered on every page via app/layout.tsx) contains
+ * a <SearchBox> with its own `<button type="submit">`. On /login that means
+ * a bare `page.locator('button[type="submit"]')` resolves to TWO elements
+ * (the header search button + the actual "Sign in" button), which trips
+ * Playwright's strict-mode and fails the test. Scoping to the <form> that
+ * contains the password field disambiguates it correctly.
+ */
+function getLoginSubmitButton(page: Page) {
+  const passwordInput = page.locator(
+    'input[type="password"], input[name="password"]',
+  );
+  return page
+    .locator('form')
+    .filter({ has: passwordInput })
+    .locator('button[type="submit"]');
+}
+
 // ─── Test data ───────────────────────────────────────────────────────────────
 
 const TEST_EMAIL    = process.env.SMOKE_EMAIL    ?? 'smoketest@elecshop.test';
@@ -186,7 +206,7 @@ test.describe('Elecshop Web — Smoke Tests', () => {
 
     const emailInput = page.locator('input[type="email"], input[name="email"]');
     const passwordInput = page.locator('input[type="password"], input[name="password"]');
-    const submitButton = page.locator('button[type="submit"]');
+    const submitButton = getLoginSubmitButton(page);
 
     await expect(emailInput).toBeVisible();
     await expect(passwordInput).toBeVisible();
@@ -212,7 +232,7 @@ test.describe('Elecshop Web — Smoke Tests', () => {
 
     await page.locator('input[type="email"], input[name="email"]').fill(TEST_EMAIL);
     await page.locator('input[type="password"], input[name="password"]').fill(TEST_PASSWORD);
-    await page.locator('button[type="submit"]').click();
+    await getLoginSubmitButton(page).click();
 
     // After login, should redirect away from /login
     await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10_000 });
