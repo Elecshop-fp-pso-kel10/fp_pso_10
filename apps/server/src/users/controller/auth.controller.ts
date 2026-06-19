@@ -48,7 +48,7 @@ export class AuthController {
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
-  ) {
+  ){
     const user = await this.authService.validateUser(
       loginDto.email,
       loginDto.password,
@@ -89,21 +89,6 @@ export class AuthController {
       throw new UnauthorizedException('Session has been revoked');
     }
     return this.usersService.refresh(request, response);
-  }
-
-    const tokens = await this.authService.refresh(refreshToken);
-
-    response.cookie('access_token', tokens.accessToken, {
-      ...cookieConfig.access.options,
-      expires: new Date(Date.now() + cookieConfig.access.options.maxAge),
-    });
-
-    response.cookie('refresh_token', tokens.refreshToken, {
-      ...cookieConfig.refresh.options,
-      expires: new Date(Date.now() + cookieConfig.refresh.options.maxAge),
-    });
-
-    return { success: true };
   }
 
   @Post('logout')
