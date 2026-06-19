@@ -32,7 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (
       user.tokenInvalidBefore &&
       typeof payload.iat === 'number' &&
-      payload.iat * 1000 < user.tokenInvalidBefore.getTime()
+      payload.iat * 1000 <= user.tokenInvalidBefore.getTime()
     ) {
       throw new UnauthorizedException('Session has been revoked');
     }
