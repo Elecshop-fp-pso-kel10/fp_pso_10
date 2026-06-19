@@ -19,6 +19,12 @@ export class User {
 
   @Prop({ type: String, default: null })
   refreshToken?: string | null;
+
+  // Any access token issued (iat) before this timestamp is considered
+  // revoked. Set on logout so previously-issued access tokens stop
+  // working immediately, even though the JWT itself hasn't expired yet.
+  @Prop({ type: Date, default: null })
+  tokenInvalidBefore?: Date | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

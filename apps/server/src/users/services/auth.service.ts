@@ -116,6 +116,7 @@ export class AuthService {
   async logout(userId: string): Promise<void> {
     await this.userModel.findByIdAndUpdate(userId, {
       refreshToken: null,
+      tokenInvalidBefore: new Date(),
     });
   }
 }

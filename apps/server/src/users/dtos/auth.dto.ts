@@ -37,6 +37,7 @@ export interface TokenPayload {
   isAdmin: boolean;
   type: 'access' | 'refresh';
   jti?: string; // Add this for refresh tokens
+  iat?: number; // issued-at (seconds since epoch), added automatically by jwt.sign
 }
 
 export class UserResponseDto {
