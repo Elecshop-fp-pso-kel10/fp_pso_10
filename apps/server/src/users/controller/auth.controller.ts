@@ -84,11 +84,26 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const user = request['user'];
-    if (!user?.refreshToken) {
+    const refreshToken = request.cookies?.refresh_token;
+    if (!refreshToken) {
       throw new UnauthorizedException('Session has been revoked');
     }
-    return this.usersService.refresh(request, response);
+
+    const tokens = await this.authService.refresh(refreshToken);
+
+    response.cookie(
+      'access_token',
+      tokens.accessToken,
+      cookieConfig.access.options,
+    );
+
+    response.cookie(
+      'refresh_token',
+      tokens.refreshToken,
+      cookieConfig.refresh.options,
+    );
+
+    return { success: true };
   }
 
   @Post('logout')
