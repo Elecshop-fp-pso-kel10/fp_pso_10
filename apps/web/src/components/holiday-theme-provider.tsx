@@ -26,7 +26,7 @@ export function HolidayThemeProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const detected = detectHoliday(new Date());
+    const detected = detectHoliday(new Date('2026-12-18'));
 
     setHoliday(detected);
     setMounted(true);
