@@ -5,16 +5,14 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 interface SearchPageProps {
-  params: {
-    keyword: string;
-  };
-  searchParams: {
-    page?: string;
-  };
+  params: Promise<{ keyword: string }>;
+  searchParams: Promise<{ page?: string }>;
 }
 
-export default function SearchPage({ params, searchParams }: SearchPageProps) {
-  const currentPage = Number(searchParams.page) || 1;
+export default async function SearchPage({ params, searchParams }: SearchPageProps) {
+  const { keyword } = await params;
+  const { page } = await searchParams;
+  const currentPage = Number(page) || 1;
 
   return (
     <Container>
@@ -27,10 +25,10 @@ export default function SearchPage({ params, searchParams }: SearchPageProps) {
             </Link>
           </Button>
           <h1 className="text-2xl font-bold">
-            Search Results: {decodeURIComponent(params.keyword)}
+            Search Results: {decodeURIComponent(keyword)}
           </h1>
         </div>
-        <ProductGrid searchKeyword={params.keyword} currentPage={currentPage} />
+        <ProductGrid searchKeyword={keyword} currentPage={currentPage} />
       </div>
     </Container>
   );

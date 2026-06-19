@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Container } from '@/components/ui/container';
 import { ProductGrid } from '@/modules/products/components/product-grid';
 import { getProducts } from '@/modules/products/actions/get-products';
@@ -11,6 +12,10 @@ import {
   PaginationEllipsis,
 } from '@/components/ui/pagination';
 import { getVisiblePages } from '@/lib/utils';
+
+export const metadata: Metadata = {
+  title: 'Elecshop — Latest Products',
+};
 
 interface HomePageProps {
   searchParams: Promise<{ page?: string }>;
