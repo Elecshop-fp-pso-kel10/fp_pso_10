@@ -29,12 +29,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-    // If the user has been logged out, refreshToken is nulled in the DB.
-    // Reject the access token so profile/protected routes return 401.
-    if (!user.refreshToken) {
-      throw new UnauthorizedException('Session has been revoked');
-    }
-
     return user;
   }
 }

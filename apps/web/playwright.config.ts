@@ -1,38 +1,58 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright configuration for Elecshop Web smoke tests.
+ * Playwright config for Elecshop Web — Smoke Tests
  *
- * Docs: https://playwright.dev/docs/test-configuration
+ * File location: apps/web/playwright.config.ts
+ *
+ * Key decisions:
+ *  - baseURL points to the staging deployment used by CI.
+ *    The CI workflow passes WEB_URL as an env var; locally it
+ *    falls back to http://localhost:3000.
+ *  - Only Chromium is used for smoke tests (fast, no flakiness
+ *    from multi-browser). Add more projects if you want coverage.
+ *  - retries=1 in CI so a single network blip doesn't fail the run.
+ *  - actionTimeout / navigationTimeout are generous (15 s) because
+ *    the staging server on Azure cold-starts slowly.
+ *  - testDir points to apps/web/tests — kept separate from src so
+ *    tsconfig can exclude it (already done in tsconfig.json).
  */
 export default defineConfig({
-  testDir: './tests/smoke',
+  testDir: './tests',
   testMatch: '**/*.spec.ts',
 
-  /* Run tests serially — smoke tests share login state */
-  fullyParallel: false,
-  workers: 1,
+  /* Global timeouts */
+  timeout: 60_000,          // per-test hard limit
+  expect: { timeout: 10_000 },
 
-  /* Retry once on CI to handle flaky network */
+  /* How many times to retry a failing test in CI */
   retries: process.env.CI ? 1 : 0,
 
-  /* Reporter */
-  reporter: [
-    ['list'],
-    ['html', { outputFolder: 'playwright-report', open: 'never' }],
-  ],
+  /* Run tests sequentially — smoke tests depend on auth state */
+  workers: 1,
+  fullyParallel: false,
+
+  /* Reporter: CI gets the GitHub-friendly reporter + HTML; local gets list */
+  reporter: process.env.CI
+    ? [['github'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
+    : [['list']],
 
   use: {
-    /* Base URL — override with WEB_URL env var */
+    /* Base URL — set WEB_URL in CI; falls back to local dev server */
     baseURL: process.env.WEB_URL ?? 'http://localhost:3000',
 
-    /* Collect trace on failure */
+    /* Generous timeouts for cold-starting staging server */
+    actionTimeout:     15_000,
+    navigationTimeout: 15_000,
+
+    /* Always collect trace on first retry so failures are debuggable */
     trace: 'on-first-retry',
+
+    /* Screenshot on failure only */
     screenshot: 'only-on-failure',
 
-    /* Reasonable timeouts */
-    actionTimeout: 10_000,
-    navigationTimeout: 15_000,
+    /* Single browser for smoke tests */
+    ...devices['Desktop Chrome'],
   },
 
   projects: [
@@ -40,24 +60,5 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    /* Uncomment to also run on Firefox and Safari:
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-    */
   ],
-
-  /* Optionally start the web server automatically in CI:
-  webServer: {
-    command: 'pnpm start',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
-  */
 });

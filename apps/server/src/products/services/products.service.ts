@@ -63,7 +63,7 @@ export class ProductsService {
       .limit(pageSize)
       .skip(pageSize * (currentPage - 1));
 
-    if (!products.length && !decodedKeyword)
+    if (!products.length && !decodedKeyword?.trim())
       throw new NotFoundException('No products found.');
 
     return {

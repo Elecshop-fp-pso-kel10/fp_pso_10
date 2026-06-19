@@ -84,10 +84,12 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const refreshToken = request.cookies['refresh_token'];
-    if (!refreshToken) {
-      throw new UnauthorizedException('No refresh token');
+    const user = request['user'];
+    if (!user?.refreshToken) {
+      throw new UnauthorizedException('Session has been revoked');
     }
+    return this.usersService.refresh(request, response);
+  }
 
     const tokens = await this.authService.refresh(refreshToken);
 
